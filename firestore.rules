@@ -69,6 +69,24 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Prices: multi-vendor price records
+    match /prices/{priceId} {
+      allow get, list: if true;
+      allow create, update: if isValidId(priceId)
+        && incoming().productId is string && incoming().productId.size() <= 128
+        && incoming().vendorName is string && incoming().vendorName.size() <= 100
+        && incoming().price is number && incoming().price > 0;
+      allow delete: if false;
+    }
+
+    // Categories: extensible taxonomy
+    match /categories/{categoryId} {
+      allow get, list: if true;
+      allow create, update: if isValidId(categoryId)
+        && incoming().name is string && incoming().name.size() <= 100;
+      allow delete: if false;
+    }
+
     // Test connection doc
     match /test/{testId} {
       allow read: if true;

@@ -21,7 +21,6 @@ import { Product, CommunityReport } from '../types';
 import { fetchReportsForProduct } from '../services/firebaseService';
 import { PriceHistoryChart } from './PriceHistoryChart';
 import { VendorComparisonList } from './VendorComparisonList';
-import { ensureProductVendors } from '../services/searchEngine';
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -273,7 +272,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           {/* Multiple Vendors Comparison List */}
           <VendorComparisonList 
             product={product} 
-            vendors={ensureProductVendors(product)} 
+            vendors={product.vendors || []} 
             isRefreshing={isRefreshingVendors}
             onRefreshLive={onRefreshLivePrices ? async () => {
               setIsRefreshingVendors(true);

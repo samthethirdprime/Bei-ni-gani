@@ -15,7 +15,27 @@ export const VendorComparisonList: React.FC<VendorComparisonListProps> = ({
   onRefreshLive,
   isRefreshing = false
 }) => {
-  if (!vendors || vendors.length === 0) return null;
+  if (!vendors || vendors.length === 0) {
+    return (
+      <div className="bg-neutral-950/70 border border-neutral-800/90 rounded-2xl p-4 text-center space-y-2">
+        <Store className="w-6 h-6 text-neutral-500 mx-auto" />
+        <h4 className="text-xs font-bold text-neutral-300">No external vendor quotes verified yet</h4>
+        <p className="text-[11px] text-neutral-500 max-w-xs mx-auto">
+          We only calculate and display genuine vendor prices. Tap below to scan live Kenyan retailers or log what you paid!
+        </p>
+        {onRefreshLive && (
+          <button
+            onClick={onRefreshLive}
+            disabled={isRefreshing}
+            className="mt-1 px-3 py-1.5 rounded-xl bg-emerald-950 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-300 text-xs font-bold inline-flex items-center gap-1.5 transition-all"
+          >
+            {isRefreshing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-amber-400" />}
+            <span>Scan Kenyan Retailers Live</span>
+          </button>
+        )}
+      </div>
+    );
+  }
 
   // Calculate stats purely from actual vendor prices
   const validPrices = vendors.map(v => v.price).filter(p => typeof p === 'number' && p > 0);

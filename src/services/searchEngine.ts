@@ -1,7 +1,7 @@
-import { Product, SearchQueryAnalysis } from '../types';
+import { Product, SearchQueryAnalysis, VendorPrice } from '../types';
 
-// Common Kenyan locations (counties, towns, estates)
-const KENYAN_LOCATIONS: { [key: string]: { county: string; town?: string } } = {
+// Comprehensive Kenyan locations dictionary
+export const KENYAN_LOCATIONS: { [key: string]: { county: string; town?: string } } = {
   'rongai': { county: 'Kajiado', town: 'Ongata Rongai' },
   'ongata rongai': { county: 'Kajiado', town: 'Ongata Rongai' },
   'nairobi': { county: 'Nairobi', town: 'Nairobi' },
@@ -41,12 +41,13 @@ const KENYAN_LOCATIONS: { [key: string]: { county: string; town?: string } } = {
   'kondele': { county: 'Kisumu', town: 'Kondele' }
 };
 
-// Kenyan natural language search phrases to strip
+// Kenyan and English Natural Language query inquiry prefixes
 const QUERY_PREFIXES = [
-  /^how\s+much\s+is\s+(the\s+)?/i,
+  /^how\s+much\s+is\s+(the\s+|a\s+|an\s+)?/i,
   /^how\s+much\s+does\s+(a\s+|an\s+)?/i,
   /^what\s+is\s+the\s+price\s+of\s+(a\s+|an\s+)?/i,
   /^what\s+is\s+the\s+cost\s+of\s+(a\s+|an\s+)?/i,
+  /^what\s+does\s+(a\s+|an\s+)?/i,
   /^price\s+of\s+(a\s+|an\s+)?/i,
   /^cost\s+of\s+(a\s+|an\s+)?/i,
   /^bei\s+ya\s+/i,
@@ -55,7 +56,8 @@ const QUERY_PREFIXES = [
   /^ni\s+how\s+much\s+(is\s+)?/i,
   /^pesa\s+ngapi\s+(ya\s+)?/i,
   /^tell\s+me\s+price\s+of\s+/i,
-  /^check\s+bei\s+ya\s+/i
+  /^check\s+bei\s+ya\s+/i,
+  /^rate\s+of\s+/i
 ];
 
 const QUERY_SUFFIXES = [
@@ -64,11 +66,14 @@ const QUERY_SUFFIXES = [
   /\s+bei$/i,
   /\s+bei\s+gani\??$/i,
   /\s+ni\s+how\s+much\??$/i,
-  /\s+ni\s+pesa\s+ngapi\??$/i
+  /\s+ni\s+pesa\s+ngapi\??$/i,
+  /\s+refill$/i,
+  /\s+refill\s+price$/i
 ];
 
 // Clean search term
 export function cleanQuery(query: string): string {
+  if (!query) return '';
   return query
     .toLowerCase()
     .replace(/[?!,.:;()"]/g, ' ')
@@ -76,11 +81,247 @@ export function cleanQuery(query: string): string {
     .trim();
 }
 
-// Parse search input to separate query intent from location
+// Canonical everyday Kenyan concepts, synonyms, categories, and subcategories
+export interface ConceptMapping {
+  canonicalName: string;
+  category: string;
+  subcategory: string;
+  swahiliName: string;
+  unit: string;
+  aliases: string[];
+  discriminators?: string[]; // words that MUST NOT trigger collision with unrelated products
+}
+
+export const CANONICAL_CONCEPTS: ConceptMapping[] = [
+  // CLOTHING & FASHION
+  {
+    canonicalName: 'Underwear / Innerwear (Boxers & Briefs)',
+    category: 'clothing',
+    subcategory: 'Underwear & Innerwear',
+    swahiliName: 'Suruali ya Ndani / Boxers',
+    unit: 'piece / 3-pack',
+    aliases: ['underwear', 'under wear', 'innerwear', 'inner wear', 'boxers', 'boxer', 'panties', 'panty', 'briefs', 'kamisi', 'shupavu', 'suruali ya ndani', 'nguo za ndani']
+  },
+  {
+    canonicalName: 'Handkerchiefs (Cotton Pocket Hankies)',
+    category: 'clothing',
+    subcategory: 'Accessories',
+    swahiliName: 'Kitambaa cha Mfukoni / Leso',
+    unit: '6-pack / piece',
+    aliases: ['handkerchief', 'handkerchiefs', 'hanky', 'hankies', 'kitambaa cha mfukoni', 'kitambaa', 'leso ya mfuko']
+  },
+  {
+    canonicalName: 'Cotton Socks',
+    category: 'clothing',
+    subcategory: 'Hosiery & Socks',
+    swahiliName: 'Soksi za Pamba',
+    unit: '3-pair pack',
+    aliases: ['socks', 'sock', 'soksi', 'stockings', 'ankle socks', 'sports socks']
+  },
+  {
+    canonicalName: 'Shoe Laces & Care',
+    category: 'footwear',
+    subcategory: 'Shoe Accessories',
+    swahiliName: 'Kamba za Viatu & Kiwi',
+    unit: 'pair',
+    aliases: ['laces', 'shoe laces', 'shoelaces', 'kamba za viatu', 'kiwi', 'shoe polish', 'insoles']
+  },
+  {
+    canonicalName: 'Eyewear & Glasses',
+    category: 'clothing',
+    subcategory: 'Eyewear & Glasses',
+    swahiliName: 'Miwani ya Macho',
+    unit: 'piece',
+    aliases: ['glasses', 'spectacles', 'sunglasses', 'reading glasses', 'miwani', 'eyewear', 'sun glasses']
+  },
+  // HOUSEHOLD & CLEANING
+  {
+    canonicalName: 'Cooking Gas (LPG Cylinders & Refills)',
+    category: 'household',
+    subcategory: 'Cooking Gas & LPG',
+    swahiliName: 'Mtungi wa Gas / Gas Refill',
+    unit: '6kg / 13kg refill',
+    aliases: ['gas', 'lpg', 'cooking gas', 'gas refill', 'gas cylinder', 'mtungi wa gas', 'k-gas', 'total gas', 'rubis gas', 'afrigas', '6kg gas', '13kg gas']
+  },
+  {
+    canonicalName: 'Air Humidifier & Diffuser',
+    category: 'household',
+    subcategory: 'Appliances & Air Quality',
+    swahiliName: 'Mashine ya Humidifier',
+    unit: 'piece',
+    aliases: ['humidifier', 'humidifiers', 'air humidifier', 'diffuser', 'aroma diffuser', 'room humidifier', 'air purifier']
+  },
+  {
+    canonicalName: 'Bedsheets & Pillowcases',
+    category: 'household',
+    subcategory: 'Bedding & Linens',
+    swahiliName: 'Mashuka ya Kitanda',
+    unit: '4-piece set',
+    aliases: ['bedsheets', 'bed sheets', 'bedsheet', 'mashuka', 'shuka', 'pillowcases', 'blanket', 'duvet', 'blankets']
+  },
+  {
+    canonicalName: 'Bathing & Laundry Bar Soap',
+    category: 'household',
+    subcategory: 'Soaps & Detergents',
+    swahiliName: 'Sabuni ya Kuoga & Kufua',
+    unit: 'bar / 800g',
+    aliases: ['soap', 'sabuni', 'bathing soap', 'bar soap', 'menengai', 'geisha', 'dettol', 'omo', 'aerial', 'detergent', 'sabuni ya kipande']
+  },
+  {
+    canonicalName: 'Toothpaste & Oral Care',
+    category: 'household',
+    subcategory: 'Personal & Oral Care',
+    swahiliName: 'Dawa ya Meno',
+    unit: '140g tube',
+    aliases: ['toothpaste', 'tooth paste', 'dawa ya meno', 'colgate', 'sensodyne', 'toothbrush', 'brush ya meno']
+  },
+  // FURNITURE
+  {
+    canonicalName: 'Shoe Rack / Stand',
+    category: 'furniture',
+    subcategory: 'Storage & Organizers',
+    swahiliName: 'Rack ya Viatu',
+    unit: 'piece',
+    aliases: ['shoe rack', 'shoerack', 'rack ya viatu', 'shoe stand', 'kabati ya viatu', 'shelf ya viatu'],
+    discriminators: ['rack', 'stand', 'shelf', 'storage', 'cabinet']
+  },
+  {
+    canonicalName: 'High Density Foam Mattress',
+    category: 'furniture',
+    subcategory: 'Mattresses & Beds',
+    swahiliName: 'Godoro la Kulala',
+    unit: '6x6 / 5x6 piece',
+    aliases: ['mattress', 'godoro', 'bobmil', 'superfoam', 'mouka', 'foam mattress', 'bed mattress', 'godoro 6x6', 'godoro 5x6']
+  },
+  // FITNESS & SPORTS
+  {
+    canonicalName: 'Workout Equipment & Gym Stuff',
+    category: 'fitness',
+    subcategory: 'Gym & Fitness Equipment',
+    swahiliName: 'Vifaa vya Gym & Mazoezi',
+    unit: 'set / pair',
+    aliases: ['workout equipment', 'gym stuff', 'gym equipment', 'fitness equipment', 'vifaa vya gym', 'vifaa vya mazoezi']
+  },
+  {
+    canonicalName: 'Dumbbells & Weights',
+    category: 'fitness',
+    subcategory: 'Gym & Fitness Equipment',
+    swahiliName: 'Dumbbells za Mazoezi',
+    unit: 'pair / per kg',
+    aliases: ['dumbbells', 'dumbbell', 'weights', 'hex dumbbells', 'hand weights', 'kettlebell']
+  },
+  {
+    canonicalName: 'Resistance Bands & Loop Sets',
+    category: 'fitness',
+    subcategory: 'Gym & Fitness Equipment',
+    swahiliName: 'Resistance Bands',
+    unit: '5-pack set',
+    aliases: ['resistance bands', 'resistance band', 'exercise bands', 'workout bands', 'loop bands', 'pull up bands']
+  },
+  // ELECTRONICS
+  {
+    canonicalName: 'Phone Charger & USB Cables',
+    category: 'electronics',
+    subcategory: 'Mobile Accessories',
+    swahiliName: 'Chaja ya Simu',
+    unit: 'piece',
+    aliases: ['phone charger', 'charger', 'usb cable', 'type c cable', 'lightning cable', 'fast charger', 'chaja', 'chaja ya simu', 'power bank']
+  },
+  // GROCERIES & COMMODITIES
+  {
+    canonicalName: 'Fresh Sweet Watermelon',
+    category: 'groceries',
+    subcategory: 'Fruits & Vegetables',
+    swahiliName: 'Tikitimaji / Tikiti Maji',
+    unit: 'kg / piece',
+    aliases: ['watermelon', 'water melon', 'tikiti', 'tikitimaji', 'tikiti maji'],
+    discriminators: ['melon', 'tikiti', 'watermelon'] // MUST NOT collide with bottled water
+  },
+  {
+    canonicalName: 'White Cane Sugar',
+    category: 'groceries',
+    subcategory: 'Pantry & Essentials',
+    swahiliName: 'Sukari Nyeupe',
+    unit: '1 kg / 2 kg',
+    aliases: ['sugar', 'sukari', 'white sugar', 'kabras', 'mumias', 'sukari ya chai', 'sukari 1kg', 'sukari 2kg']
+  },
+  {
+    canonicalName: 'Fresh Beef (Steak / Bone)',
+    category: 'groceries',
+    subcategory: 'Meat & Butchery',
+    swahiliName: 'Nyama ya Ng\'ombe',
+    unit: '1 kg',
+    aliases: ['meat', 'nyama', 'beef', "nyama ya ng'ombe", 'nyama ya ngombe', 'steak', 'nyama choma']
+  },
+  {
+    canonicalName: 'Whole Dressed Chicken',
+    category: 'groceries',
+    subcategory: 'Poultry',
+    swahiliName: 'Kuku Mzima (Broiler / Kienyeji)',
+    unit: 'bird / kg',
+    aliases: ['chicken', 'kuku', 'broiler', 'kienyeji', 'kuku kienyeji', 'kuku mzima', 'poultry']
+  },
+  // BUILDING & HARDWARE
+  {
+    canonicalName: 'Portland Cement (50kg Bag)',
+    category: 'hardware',
+    subcategory: 'Building Materials',
+    swahiliName: 'Simiti (Mfuko wa 50kg)',
+    unit: '50kg bag',
+    aliases: ['cement', 'simiti', 'bamburi', 'tembo cement', 'blue triangle', 'simiti 50kg', 'mfuko wa simiti']
+  },
+  // SERVICES
+  {
+    canonicalName: 'Barber & Kinyozi Haircut',
+    category: 'services',
+    subcategory: 'Grooming & Hair',
+    swahiliName: 'Kinyozi / Kunyoa Nywele',
+    unit: 'cut / session',
+    aliases: ['barber', 'kinyozi', 'haircut', 'kunyoa', 'shave', 'salon', 'kinyozi haircut']
+  },
+  {
+    canonicalName: 'Plumber & Pipe Repair (Fundi wa Maji)',
+    category: 'services',
+    subcategory: 'Plumbing & Repairs',
+    swahiliName: 'Fundi wa Maji & Mabomba',
+    unit: 'call-out / job',
+    aliases: ['plumber', 'fundi wa maji', 'fundi bomba', 'plumbing', 'bomba', 'water pipe repair']
+  },
+  {
+    canonicalName: 'Electrician & Wiring (Fundi wa Stima)',
+    category: 'services',
+    subcategory: 'Electrical & Wiring',
+    swahiliName: 'Fundi wa Stima & Umeme',
+    unit: 'call-out / point',
+    aliases: ['electrician', 'fundi wa stima', 'fundi stima', 'wiring', 'electrical repair', 'fundi umeme', 'stima']
+  },
+  {
+    canonicalName: 'Car Wash & Detailing',
+    category: 'services',
+    subcategory: 'Automotive Services',
+    swahiliName: 'Kuosha Gari',
+    unit: 'vehicle / wash',
+    aliases: ['car wash', 'kuosha gari', 'carwash', 'auto wash', 'cleaning car']
+  }
+];
+
+// Brand dictionary for Kenya
+const KNOWN_BRANDS = [
+  'samsung', 'apple', 'iphone', 'tecno', 'infinix', 'xiaomi', 'oppo', 'nokia', 'sony', 'lg',
+  'hp', 'dell', 'lenovo', 'asus', 'acer', 'macbook', 'jbl', 'ramtons', 'mika', 'bruhm', 'hisense',
+  'bamburi', 'savannah', 'mombasa cement', 'blue triangle', 'dumuzas', 'totalenergies', 'total',
+  'rubis', 'k-gas', 'afrigas', 'hashi', 'bobmil', 'superfoam', 'vitafoam', 'geisha', 'dettol',
+  'colgate', 'sensodyne', 'close up', 'nike', 'adidas', 'puma', 'bata', 'kiwi', 'menengai', 'bidco'
+];
+
+// Size & Quantity patterns
+const SIZE_REGEX = /\b(\d+(?:\.\d+)?\s*(?:kg|g|litre|litres|l|ml|gb|mb|tb|inch|inches|cm|mm|m|ft|piece|pieces|pair|pairs|pack|set|tier|seater|seater|x\d+))\b/i;
+
+// Parse search input to separate query intent, location, brand, and size
 export function analyzeSearchQuery(rawQuery: string): SearchQueryAnalysis {
   let cleaned = cleanQuery(rawQuery);
 
-  // Strip natural language inquiry prefixes
+  // 1. Strip natural language inquiry prefixes
   for (const prefix of QUERY_PREFIXES) {
     if (prefix.test(cleaned)) {
       cleaned = cleaned.replace(prefix, '').trim();
@@ -88,7 +329,7 @@ export function analyzeSearchQuery(rawQuery: string): SearchQueryAnalysis {
     }
   }
 
-  // Strip inquiry suffixes
+  // 2. Strip inquiry suffixes
   for (const suffix of QUERY_SUFFIXES) {
     if (suffix.test(cleaned)) {
       cleaned = cleaned.replace(suffix, '').trim();
@@ -96,7 +337,7 @@ export function analyzeSearchQuery(rawQuery: string): SearchQueryAnalysis {
     }
   }
 
-  // Check for location mentions (longest match first)
+  // 3. Extract location mentions
   let detectedLocation: string | undefined;
   const sortedLocations = Object.keys(KENYAN_LOCATIONS).sort((a, b) => b.length - a.length);
 
@@ -104,53 +345,64 @@ export function analyzeSearchQuery(rawQuery: string): SearchQueryAnalysis {
     const regex = new RegExp(`\\b${locKey}\\b`, 'i');
     if (regex.test(cleaned)) {
       detectedLocation = KENYAN_LOCATIONS[locKey].town || KENYAN_LOCATIONS[locKey].county;
-      // Remove location from query to isolate product term, e.g. "bedsitter Rongai" -> "bedsitter"
       cleaned = cleaned.replace(regex, '').replace(/\s+/g, ' ').trim();
       break;
     }
   }
 
+  // 4. Extract Brand if present
+  let detectedBrand: string | undefined;
+  for (const brand of KNOWN_BRANDS) {
+    const brandRegex = new RegExp(`\\b${brand}\\b`, 'i');
+    if (brandRegex.test(cleaned)) {
+      detectedBrand = brand.charAt(0).toUpperCase() + brand.slice(1);
+      break;
+    }
+  }
+
+  // 5. Extract Size / Quantity if present
+  let detectedSize: string | undefined;
+  const sizeMatch = cleaned.match(SIZE_REGEX);
+  if (sizeMatch) {
+    detectedSize = sizeMatch[0];
+  }
+
+  // 6. Match Canonical everyday concepts
+  let canonicalName: string | undefined;
+  let detectedCategory: string | undefined;
+  let detectedSubcategory: string | undefined;
+
+  for (const concept of CANONICAL_CONCEPTS) {
+    for (const alias of concept.aliases) {
+      const aliasClean = cleanQuery(alias);
+      if (cleaned === aliasClean || cleaned.startsWith(aliasClean + ' ') || cleaned.endsWith(' ' + aliasClean) || cleaned.includes(' ' + aliasClean + ' ')) {
+        canonicalName = concept.canonicalName;
+        detectedCategory = concept.category;
+        detectedSubcategory = concept.subcategory;
+        break;
+      }
+    }
+    if (canonicalName) break;
+  }
+
   return {
     rawQuery,
     itemQuery: cleaned,
+    canonicalName,
+    detectedCategory,
+    detectedSubcategory,
+    detectedBrand,
+    detectedSize,
     detectedLocation
   };
 }
 
-// Kenyan Synonyms Groups mapping English, Swahili, and Kenyan marketplace terms
-const KENYAN_SYNONYM_GROUPS: string[][] = [
-  ['meat', 'nyama', 'beef', "nyama ya ng'ombe", 'nyama ya ngombe', 'steak'],
-  ['chicken', 'kuku', 'broiler', 'kienyeji', 'kuku kienyeji', 'poultry'],
-  ['sugar', 'sukari', 'white sugar', 'sukari nyeupe'],
-  ['onions', 'vitunguu', 'onion', 'kitunguu', 'red onions', 'vitunguu maji'],
-  ['tomatoes', 'nyanya', 'tomato', 'nyanya fresh'],
-  ['barber', 'kinyozi', 'haircut', 'kunyoa', 'shave', 'salon kinyozi'],
-  ['plumber', 'fundi wa maji', 'fundi bomba', 'plumbing', 'bomba', 'water pipe'],
-  ['electrician', 'fundi wa stima', 'fundi stima', 'wiring', 'electrical'],
-  ['cement', 'simiti', 'bamburi', 'tembo cement', 'blue triangle'],
-  ['sand', 'mchanga', 'river sand', 'mchanga wa mto'],
-  ['iron sheets', 'mabati', 'dumuzas', 'box profile', 'mabati ya kuezeka'],
-  ['socks', 'soksi', 'stockings'],
-  ['shoe rack', 'rack ya viatu', 'shoerack', 'shelf ya viatu'],
-  ['shoes', 'viatu', 'sneakers', 'sandals', 'slippers'],
-  ['mattress', 'godoro', 'mouka', 'foam mattress', 'bobmil', 'superfoam'],
-  ['bedsitter', 'chumba', 'studio apartment', 'single room', 'bed sitter'],
-  ['car wash', 'kuosha gari', 'carwash', 'auto wash'],
-  ['painting', 'house painting', 'kupaka rangi', 'fundi wa rangi', 'painter'],
-  ['potatoes', 'viazi', 'waru', 'irish potatoes'],
-  ['milk', 'maziwa', 'fresh milk', 'maziwa lala'],
-  ['cooking oil', 'mafuta ya kupikia', 'mafuta', 'salad'],
-  ['maize flour', 'unga', 'unga wa ugali', 'unga wa sembe'],
-  ['boda boda', 'bodaboda', 'piki piki', 'pikipiki', 'motorcycle'],
-  ['phone', 'simu', 'smartphone', 'mobile phone']
-];
-
 // Custom stem/alias normalizer for Kenyan English & Swahili
-function getCanonicalVariants(text: string): string[] {
+export function getCanonicalVariants(text: string): string[] {
   const norm = cleanQuery(text);
   const variants = new Set<string>([norm]);
 
-  // Handle compound words (e.g., "water melon" <-> "watermelon", "shoe rack" <-> "shoerack")
+  // Handle compound words
   if (norm.includes('water melon')) variants.add(norm.replace('water melon', 'watermelon'));
   if (norm.includes('watermelon')) variants.add(norm.replace('watermelon', 'water melon'));
   if (norm.includes('shoe rack')) variants.add(norm.replace('shoe rack', 'shoerack'));
@@ -158,18 +410,18 @@ function getCanonicalVariants(text: string): string[] {
   if (norm.includes('boda boda')) variants.add(norm.replace('boda boda', 'bodaboda'));
   if (norm.includes('bodaboda')) variants.add(norm.replace('bodaboda', 'boda boda'));
 
-  // Swahili apostrophe variations: ng'ombe vs ngombe
+  // Swahili apostrophes
   if (norm.includes("ng'ombe")) variants.add(norm.replace("ng'ombe", 'ngombe'));
   if (norm.includes('ngombe')) variants.add(norm.replace('ngombe', "ng'ombe"));
 
-  // Check synonym groups
-  for (const group of KENYAN_SYNONYM_GROUPS) {
-    if (group.some(term => norm === term || norm.includes(term))) {
-      group.forEach(term => variants.add(term));
+  // Match concept aliases
+  for (const concept of CANONICAL_CONCEPTS) {
+    if (concept.aliases.some(a => norm === a || norm.includes(a) || a.includes(norm))) {
+      concept.aliases.forEach(a => variants.add(a));
     }
   }
 
-  // Singular/Plural simple mappings
+  // Plurals
   if (norm.endsWith('s') && norm.length > 3) variants.add(norm.slice(0, -1));
   if (!norm.endsWith('s') && norm.length >= 3) variants.add(norm + 's');
 
@@ -180,92 +432,80 @@ function getCanonicalVariants(text: string): string[] {
 export function calculateMatchScore(query: string, product: Product): number {
   if (!query) return 100;
 
-  const queryVariants = getCanonicalVariants(query);
-  const searchableTerms: string[] = [
-    cleanQuery(product.name),
-    cleanQuery(product.swahiliName || ''),
-    ...(product.aliases || []).map(cleanQuery),
-    cleanQuery(product.category),
-    cleanQuery(product.subcategory || ''),
-    cleanQuery(product.brand || '')
-  ].filter(Boolean);
+  const cleanQ = cleanQuery(query);
+  const queryVariants = getCanonicalVariants(cleanQ);
+
+  const prodName = cleanQuery(product.name);
+  const swaName = cleanQuery(product.swahiliName || '');
+  const aliases = (product.aliases || []).map(cleanQuery);
+  const category = cleanQuery(product.category);
+  const subcategory = cleanQuery(product.subcategory || '');
+  const brand = cleanQuery(product.brand || '');
+
+  // CRITICAL ANTI-COLLISION GUARDS:
+  // 1. Watermelon must NEVER match bottled water / water tank / drinking water
+  const isWatermelonQuery = cleanQ.includes('watermelon') || cleanQ.includes('water melon') || cleanQ.includes('tikiti');
+  const isBottledWaterProduct = prodName.includes('bottled water') || prodName.includes('mineral water') || prodName.includes('water tank');
+  if (isWatermelonQuery && isBottledWaterProduct) {
+    return 0; // Absolute block
+  }
+  const isWaterQuery = (cleanQ === 'water' || cleanQ === 'bottled water' || cleanQ === 'mineral water');
+  const isWatermelonProduct = prodName.includes('watermelon') || swaName.includes('tikiti');
+  if (isWaterQuery && isWatermelonProduct) {
+    return 0; // Absolute block
+  }
+
+  // 2. Shoe rack vs plain shoes:
+  const isShoeRackQuery = cleanQ.includes('shoe rack') || cleanQ.includes('shoerack') || cleanQ.includes('rack ya viatu');
+  const isPlainShoesProduct = (prodName.includes('shoes') || prodName.includes('sneakers')) && !prodName.includes('rack');
+  if (isShoeRackQuery && isPlainShoesProduct) {
+    return 0;
+  }
 
   // Exact Match Check (Highest Priority)
   for (const qv of queryVariants) {
-    // Exact match with name, swahili name or alias
-    if (searchableTerms.includes(qv)) {
+    if (prodName === qv || swaName === qv || aliases.includes(qv)) {
       return 100;
     }
-
-    // Check alias exact equality
-    for (const alias of product.aliases || []) {
-      const cAlias = cleanQuery(alias);
-      if (cAlias === qv) return 100;
-      if (cAlias.length > 2 && qv.length > 2) {
-        if (cAlias.startsWith(qv) || qv.startsWith(cAlias)) return 95;
-      }
-    }
   }
 
-  // Token-level accuracy guard:
-  // Split query into words
-  const queryTokens = query.split(/\s+/).filter(t => t.length > 0);
-
-  // CRITICAL ANTI-FUZZY GUARD:
-  // e.g. Query "watermelon" must NEVER match "bottled water"
-  // If query is "watermelon", it contains "melon". "bottled water" does not contain "melon".
-  // Check if every token in query has a reasonable anchor in the product terms:
-  let allTokensMatched = true;
-  let partialScore = 0;
-
-  for (const token of queryTokens) {
-    let tokenFound = false;
-
-    // Direct token inclusion in searchable fields
-    for (const term of searchableTerms) {
-      const termWords = term.split(/\s+/);
-      
-      // Exact word match
-      if (termWords.includes(token)) {
-        tokenFound = true;
-        partialScore += 25;
-        break;
-      }
-
-      // Word prefix match (e.g. "sock" matches "socks", "cement" matches "cement")
-      if (termWords.some(w => (w.startsWith(token) || token.startsWith(w)) && Math.abs(w.length - token.length) <= 2)) {
-        tokenFound = true;
-        partialScore += 20;
-        break;
-      }
-    }
-
-    if (!tokenFound) {
-      allTokensMatched = false;
-      break;
-    }
-  }
-
-  if (allTokensMatched && queryTokens.length > 0) {
-    return Math.min(85, 60 + partialScore);
-  }
-
-  // Check if query is contained as a substring in product name ONLY IF query length is >= 4
-  // and does not violate token boundaries (e.g., prevents "water" from matching inside "watermelon" blindly)
+  // Substring Match in Name or Swahili Name with token boundary
   for (const qv of queryVariants) {
-    if (qv.length >= 4) {
-      const prodName = cleanQuery(product.name);
-      const swaName = cleanQuery(product.swahiliName || '');
-      
-      // Ensure it is bounded by word boundaries or start/end
-      const regex = new RegExp(`(^|\\s)${qv}($|\\s)`);
-      if (regex.test(prodName) || regex.test(swaName)) {
-        return 75;
+    if (qv.length >= 3) {
+      const boundaryRegex = new RegExp(`(^|\\s)${qv}($|\\s)`);
+      if (boundaryRegex.test(prodName) || boundaryRegex.test(swaName)) {
+        return 90;
       }
     }
   }
 
-  return 0; // No valid, confident match
+  // Token-level accuracy guard
+  const queryTokens = cleanQ.split(/\s+/).filter(t => t.length > 1);
+  const allSearchableWords = [
+    ...prodName.split(/\s+/),
+    ...swaName.split(/\s+/),
+    ...aliases.flatMap(a => a.split(/\s+/)),
+    ...category.split(/\s+/),
+    ...subcategory.split(/\s+/),
+    ...brand.split(/\s+/)
+  ].filter(Boolean);
+
+  let tokensMatched = 0;
+  for (const token of queryTokens) {
+    if (allSearchableWords.some(w => w === token || (w.startsWith(token) && Math.abs(w.length - token.length) <= 2))) {
+      tokensMatched++;
+    }
+  }
+
+  if (tokensMatched === queryTokens.length && queryTokens.length > 0) {
+    return 80;
+  }
+
+  if (tokensMatched > 0 && queryTokens.length > 1 && tokensMatched >= Math.ceil(queryTokens.length * 0.6)) {
+    return 65;
+  }
+
+  return 0;
 }
 
 // Main Search Function
@@ -283,12 +523,14 @@ export function searchProducts(
 
   // 1. Filter by category if selected
   if (selectedCategory && selectedCategory !== 'all') {
-    candidates = candidates.filter(
-      p => p.category.toLowerCase() === selectedCategory.toLowerCase()
-    );
+    candidates = candidates.filter(p => {
+      const pCat = p.category.toLowerCase().replace(/[^a-z]/g, '');
+      const sCat = selectedCategory.toLowerCase().replace(/[^a-z]/g, '');
+      return pCat === sCat || pCat.includes(sCat) || sCat.includes(pCat);
+    });
   }
 
-  // If query is completely empty, return recent/all sorted by reports/confirms
+  // If query is completely empty, return items sorted by confirms & reports
   if (!targetItem) {
     if (targetLocation) {
       return candidates.filter(p => 
@@ -306,7 +548,6 @@ export function searchProducts(
       const matchScore = calculateMatchScore(targetItem, product);
       let locationBoost = 0;
 
-      // Location match bonus or filter
       if (targetLocation) {
         const matchesLocation =
           product.county.toLowerCase().includes(targetLocation.toLowerCase()) ||
@@ -314,75 +555,20 @@ export function searchProducts(
           (product.area && product.area.toLowerCase().includes(targetLocation.toLowerCase()));
         
         if (matchesLocation) {
-          locationBoost = 15;
+          locationBoost = 10;
         }
       }
 
       const totalScore = matchScore > 0 ? matchScore + locationBoost : 0;
       return { product, totalScore };
     })
-    .filter(item => item.totalScore >= 50) // Strict cutoff against false positives
+    .filter(item => item.totalScore >= 60)
     .sort((a, b) => b.totalScore - a.totalScore);
 
   return scored.map(item => item.product);
 }
 
-// Helper to ensure every product has multiple realistic vendors for comparison
-export function ensureProductVendors(product: Product): NonNullable<Product['vendors']> {
-  if (product.vendors && product.vendors.length > 0) {
-    return product.vendors;
-  }
-
-  const vendorsList: NonNullable<Product['vendors']> = [];
-  const sources = product.retailerOrSource ? product.retailerOrSource.split(/[/&,]/).map(s => s.trim()).filter(Boolean) : [];
-
-  const mainVendor = sources[0] || 'Kenyan Retailer Direct';
-  const secondVendor = sources[1] || 'Local Market Vendor';
-  const thirdVendor = sources[2] || 'Estate Outlet / Supermarket';
-
-  vendorsList.push({
-    id: `${product.id}-v1`,
-    vendorName: mainVendor,
-    price: product.minPrice,
-    unit: product.unit,
-    location: product.town || product.county || 'Nairobi',
-    sourceType: 'ONLINE_RETAILER',
-    sourceUrl: product.sourceUrl,
-    dateCollected: product.dateCollected || 'Today',
-    inStock: true,
-    notes: 'Best benchmark rate'
-  });
-
-  vendorsList.push({
-    id: `${product.id}-v2`,
-    vendorName: secondVendor,
-    price: product.typicalPrice,
-    unit: product.unit,
-    location: product.county || 'Nairobi',
-    sourceType: 'PHYSICAL_STORE',
-    sourceUrl: product.sourceUrl,
-    dateCollected: product.dateCollected || 'Recent',
-    inStock: true,
-    notes: 'Standard market retail'
-  });
-
-  vendorsList.push({
-    id: `${product.id}-v3`,
-    vendorName: thirdVendor,
-    price: product.maxPrice,
-    unit: product.unit,
-    location: product.area || product.county || 'Nairobi',
-    sourceType: 'MARKET_STALL',
-    sourceUrl: product.sourceUrl,
-    dateCollected: product.dateCollected || 'Recent',
-    inStock: true,
-    notes: 'Convenience / estate rate'
-  });
-
-  return vendorsList;
-}
-
-// Real-time live dynamic search query
+// Real-time live dynamic search query to server backend
 export async function searchRealtimePrice(
   rawQuery: string,
   county?: string,

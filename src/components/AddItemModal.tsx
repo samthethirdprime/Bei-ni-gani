@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Plus, Sparkles, CheckCircle2 } from 'lucide-react';
 import { Product } from '../types';
+import { analyzeSearchQuery, CANONICAL_CONCEPTS } from '../services/searchEngine';
 
 interface AddItemModalProps {
   initialName?: string;
@@ -10,16 +11,20 @@ interface AddItemModalProps {
 
 const CATEGORY_OPTIONS = [
   { value: 'groceries', label: 'Groceries & Food' },
-  { value: 'household', label: 'Household Items' },
-  { value: 'hardware', label: 'Building & Hardware' },
+  { value: 'clothing', label: 'Clothing & Fashion' },
+  { value: 'footwear', label: 'Footwear & Shoes' },
+  { value: 'household', label: 'Household Items & Gas' },
+  { value: 'kitchen', label: 'Kitchen & Dining' },
+  { value: 'personal_care', label: 'Personal Care & Beauty' },
+  { value: 'fitness', label: 'Fitness & Sports Equipment' },
   { value: 'electronics', label: 'Electronics & Gadgets' },
-  { value: 'clothing', label: 'Clothing & Footwear' },
+  { value: 'hardware', label: 'Building & Hardware' },
   { value: 'furniture', label: 'Furniture & Decor' },
   { value: 'automotive', label: 'Automotive & Spares' },
-  { value: 'beauty', label: 'Beauty & Personal Care' },
+  { value: 'baby', label: 'Baby & Family' },
+  { value: 'services', label: 'Fundis & Professional Services' },
   { value: 'housing', label: 'Housing & Rent' },
-  { value: 'transport', label: 'Transport & Fares' },
-  { value: 'services', label: 'Fundis & Professional Services' }
+  { value: 'transport', label: 'Transport & Fares' }
 ];
 
 export const AddItemModal: React.FC<AddItemModalProps> = ({
@@ -27,13 +32,16 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
   onClose,
   onAddProduct
 }) => {
-  const [name, setName] = useState(initialName);
-  const [swahiliName, setSwahiliName] = useState('');
-  const [category, setCategory] = useState('groceries');
+  const analysis = analyzeSearchQuery(initialName);
+  const matchedConcept = CANONICAL_CONCEPTS.find(c => c.canonicalName === analysis.canonicalName);
+
+  const [name, setName] = useState(analysis.canonicalName || initialName);
+  const [swahiliName, setSwahiliName] = useState(matchedConcept?.swahiliName || '');
+  const [category, setCategory] = useState(analysis.detectedCategory || matchedConcept?.category || 'groceries');
   const [pricePaid, setPricePaid] = useState<number | ''>('');
-  const [quantity, setQuantity] = useState('1 piece');
-  const [unit, setUnit] = useState('piece');
-  const [county, setCounty] = useState('Nairobi');
+  const [quantity, setQuantity] = useState(analysis.detectedSize || matchedConcept?.unit || '1 piece');
+  const [unit, setUnit] = useState(matchedConcept?.unit ? matchedConcept.unit.split('/')[0].trim() : 'piece');
+  const [county, setCounty] = useState(analysis.detectedLocation || 'Nairobi');
   const [area, setArea] = useState('');
   const [storeName, setStoreName] = useState('');
   const [description, setDescription] = useState('');

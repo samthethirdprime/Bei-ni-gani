@@ -16,6 +16,7 @@ import {
 
 interface LiveSearchScannerProps {
   query: string;
+  identifiedName?: string;
   isSearching: boolean;
   searchFailed: boolean;
   failedMessage?: string;
@@ -34,6 +35,7 @@ const SOURCES = [
 
 export const LiveSearchScanner: React.FC<LiveSearchScannerProps> = ({
   query,
+  identifiedName,
   isSearching,
   searchFailed,
   failedMessage,
@@ -42,6 +44,7 @@ export const LiveSearchScanner: React.FC<LiveSearchScannerProps> = ({
   onRetry
 }) => {
   const [activeStep, setActiveStep] = useState(0);
+  const displayName = identifiedName || query;
 
   useEffect(() => {
     if (!isSearching) {
@@ -135,26 +138,29 @@ export const LiveSearchScanner: React.FC<LiveSearchScannerProps> = ({
         </div>
 
         <div className="space-y-1.5 max-w-md mx-auto">
+          <div className="text-xs uppercase font-extrabold tracking-wider text-amber-400">
+            {displayName}
+          </div>
           <h3 className="text-lg sm:text-xl font-bold text-white font-['Space_Grotesk']">
-            We couldn't find a verified current price for this item.
+            No verified current price found.
           </h3>
           <p className="text-xs text-neutral-400 leading-relaxed">
             {failedMessage || (
               <>
-                We searched legitimate Kenyan online retailers, supermarkets, and public price listings, but could not confirm a recent verified price for <strong className="text-neutral-200">"{query}"</strong>. Bei Gani does not manufacture prices.
+                We checked legitimate Kenyan retailers, supermarkets, and public catalogs for <strong className="text-neutral-200">"{displayName}"</strong>, but no verified price was found. Bei Gani never manufactures or guesses prices.
               </>
             )}
           </p>
         </div>
 
-        {/* Action Buttons: Add Item or Report */}
+        {/* Action Buttons: Report a price or Add Item */}
         <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
           <button
-            onClick={() => onOpenAddItem(query)}
+            onClick={() => onOpenAddItem(displayName)}
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold text-xs tracking-wide shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
           >
             <Plus className="w-4 h-4 stroke-[3]" />
-            <span>+ ADD ITEM ("{query || 'New Item'}")</span>
+            <span>Report a price ({displayName})</span>
           </button>
 
           <button

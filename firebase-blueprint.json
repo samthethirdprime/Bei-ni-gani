@@ -26,7 +26,7 @@
         },
         "category": {
           "type": "string",
-          "description": "General category (groceries, household, electronics, building, automotive, services, housing, transport, etc.)",
+          "description": "General category (groceries, clothing, footwear, household, kitchen, personal_care, electronics, hardware, fitness, furniture, automotive, baby, services, housing, transport)",
           "maxLength": 64
         },
         "subcategory": {
@@ -46,7 +46,7 @@
         },
         "unit": {
           "type": "string",
-          "description": "Unit of measurement (kg, piece, bag, liter, month, trip, service)",
+          "description": "Unit of measurement (kg, piece, bag, pair, pack, liter, month, trip, service)",
           "maxLength": 32
         },
         "image": {
@@ -126,6 +126,10 @@
           "type": "boolean",
           "description": "Whether this item was submitted by a user"
         },
+        "isRealtimeDiscovered": {
+          "type": "boolean",
+          "description": "Whether this item was discovered through real-time multi-vendor search"
+        },
         "createdAt": {
           "type": "string",
           "description": "ISO timestamp string",
@@ -138,6 +142,104 @@
         }
       },
       "required": ["name", "category", "unit", "typicalPrice"]
+    },
+    "PriceRecord": {
+      "title": "PriceRecord",
+      "description": "Vendor specific price quote for an item at a specific Kenyan location",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique price record ID",
+          "maxLength": 128
+        },
+        "productId": {
+          "type": "string",
+          "description": "Associated product ID",
+          "maxLength": 128
+        },
+        "vendorId": {
+          "type": "string",
+          "description": "Vendor ID if known",
+          "maxLength": 128
+        },
+        "vendorName": {
+          "type": "string",
+          "description": "Retailer, stall or store name",
+          "maxLength": 100
+        },
+        "price": {
+          "type": "number",
+          "description": "Observed price in KSh"
+        },
+        "currency": {
+          "type": "string",
+          "description": "KES currency code",
+          "maxLength": 8
+        },
+        "unit": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "maxLength": 32
+        },
+        "location": {
+          "type": "string",
+          "description": "Specific town or estate",
+          "maxLength": 64
+        },
+        "county": {
+          "type": "string",
+          "description": "County in Kenya",
+          "maxLength": 64
+        },
+        "source": {
+          "type": "string",
+          "description": "Source name or domain",
+          "maxLength": 100
+        },
+        "sourceUrl": {
+          "type": "string",
+          "description": "Direct source link",
+          "maxLength": 1024
+        },
+        "collectedAt": {
+          "type": "string",
+          "description": "Date or relative date collected",
+          "maxLength": 64
+        },
+        "inStock": {
+          "type": "boolean",
+          "description": "Stock status"
+        }
+      },
+      "required": ["productId", "vendorName", "price"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Extensible category and subcategory taxonomy for Kenyan goods and services",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique category slug",
+          "maxLength": 64
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of category",
+          "maxLength": 100
+        },
+        "slug": {
+          "type": "string",
+          "description": "Slug identifier",
+          "maxLength": 64
+        },
+        "subcategories": {
+          "type": "array",
+          "description": "List of subcategory names"
+        }
+      },
+      "required": ["id", "name", "slug"]
     },
     "CommunityReport": {
       "title": "CommunityReport",
@@ -260,6 +362,18 @@
         "$ref": "Product"
       },
       "description": "Master catalog of Kenyan goods and services with pricing ranges"
+    },
+    "/prices/{priceId}": {
+      "schema": {
+        "$ref": "PriceRecord"
+      },
+      "description": "Verified multiple vendor price records"
+    },
+    "/categories/{categoryId}": {
+      "schema": {
+        "$ref": "Category"
+      },
+      "description": "Extensible category definitions and subcategories"
     },
     "/reports/{reportId}": {
       "schema": {

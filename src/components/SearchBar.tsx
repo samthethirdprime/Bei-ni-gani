@@ -13,16 +13,17 @@ interface SearchBarProps {
 }
 
 const EXAMPLE_SEARCHES = [
-  { label: 'nyama', term: 'nyama' },
-  { label: 'sugar', term: 'sugar' },
+  { label: 'boxers', term: 'boxers' },
+  { label: 'gas', term: 'gas' },
+  { label: 'humidifier', term: 'humidifier' },
   { label: 'cement', term: 'cement' },
-  { label: 'socks', term: 'socks' },
+  { label: 'beef / nyama', term: 'nyama' },
+  { label: 'sugar / sukari', term: 'sukari' },
   { label: 'shoe rack', term: 'shoe rack' },
-  { label: 'PS5', term: 'PS5' },
+  { label: 'socks', term: 'socks' },
+  { label: 'workout equipment', term: 'workout equipment' },
   { label: 'plumber', term: 'plumber' },
-  { label: 'bedsitter', term: 'bedsitter' },
-  { label: 'kuku', term: 'kuku' },
-  { label: 'watermelon', term: 'watermelon' }
+  { label: 'barber / kinyozi', term: 'kinyozi' }
 ];
 
 export const SearchBar: React.FC<SearchBarProps> = ({
@@ -61,7 +62,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           value={query}
           onChange={(e) => onChangeQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="What are you looking for? 🔍 (e.g. nyama, cement, socks, PS5...)"
+          placeholder="Search any product or service... (e.g. boxers, gas refill, humidifier, nyama, cement...)"
           className="w-full pl-12 pr-28 sm:pr-32 py-3.5 sm:py-4 bg-neutral-900/90 text-white placeholder-neutral-500 rounded-2xl border border-neutral-800 focus:border-emerald-500/80 focus:ring-4 focus:ring-emerald-500/10 text-base md:text-lg font-medium shadow-xl transition-all outline-none"
         />
 

@@ -146,6 +146,24 @@ export default function App() {
     return analyzeSearchQuery(searchQuery);
   }, [searchQuery]);
 
+  // Dynamic category calculations
+  const dynamicCategories = useMemo(() => {
+    const set = new Set<string>();
+    products.forEach(p => {
+      if (p.category) set.add(p.category.toLowerCase().trim());
+    });
+    return Array.from(set);
+  }, [products]);
+
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: products.length };
+    products.forEach(p => {
+      const cat = (p.category || '').toLowerCase().trim();
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
+    return counts;
+  }, [products]);
+
   // Filtered & accurately matched products from internal catalog
   const searchResults = useMemo(() => {
     return searchProducts(products, searchQuery, selectedCategory, selectedCounty);
@@ -282,6 +300,17 @@ export default function App() {
   // Submit what user paid
   const handlePaidSubmit = async (reportData: Omit<CommunityReport, 'id' | 'createdAt'>) => {
     await submitPaidReport(reportData);
+    setProducts(prev => prev.map(p => {
+      if (p.id === reportData.productId) {
+        return {
+          ...p,
+          reportsCount: (p.reportsCount || 0) + 1,
+          minPrice: Math.min(p.minPrice, reportData.reportedPrice),
+          maxPrice: Math.max(p.maxPrice, reportData.reportedPrice)
+        };
+      }
+      return p;
+    }));
     showToast('✓ Your price paid was saved to Bei Gani!');
   };
 
@@ -300,6 +329,7 @@ export default function App() {
   // Add missing product
   const handleAddProduct = async (productData: Parameters<typeof addCommunityProduct>[0]) => {
     const newProd = await addCommunityProduct(productData);
+    setProducts(prev => [newProd, ...prev.filter(p => p.id !== newProd.id)]);
     showToast(`✓ "${newProd.name}" added to catalog!`);
     setActiveProduct(newProd);
   };
@@ -393,6 +423,8 @@ export default function App() {
           <CategoryFilter
             selectedCategory={selectedCategory}
             onSelectCategory={setSelectedCategory}
+            categoryCounts={categoryCounts}
+            dynamicCategories={dynamicCategories}
           />
         </section>
 
@@ -459,6 +491,7 @@ export default function App() {
         {(isLiveSearching || (searchResults.length === 0 && searchQuery.trim().length >= 2)) && (
           <LiveSearchScanner
             query={searchQuery}
+            identifiedName={queryAnalysis.canonicalName || queryAnalysis.itemQuery}
             isSearching={isLiveSearching}
             searchFailed={liveSearchFailed}
             failedMessage={liveSearchFailedMessage}

@@ -78,6 +78,8 @@ export async function testConnection(): Promise<boolean> {
 const PRODUCTS_COLLECTION = 'products';
 const REPORTS_COLLECTION = 'reports';
 const FEEDBACK_COLLECTION = 'feedback';
+const PRICES_COLLECTION = 'prices';
+const CATEGORIES_COLLECTION = 'categories';
 
 // Fetch all products or seed if empty
 export async function fetchProductsFromFirestore(): Promise<Product[]> {
@@ -284,6 +286,22 @@ export async function addCommunityProduct(
       createdAt: now
     });
 
+    // Record in prices collection
+    const priceId = `price-${newId}-p1`;
+    await setDoc(doc(db, PRICES_COLLECTION, priceId), {
+      id: priceId,
+      productId: newId,
+      vendorName: newProduct.retailerOrSource,
+      price: newProduct.typicalPrice,
+      currency: 'KES',
+      unit: newProduct.unit,
+      location: newProduct.town || newProduct.county,
+      county: newProduct.county,
+      source: 'Community User Submission',
+      collectedAt: 'Today',
+      inStock: true
+    }).catch(e => console.warn('Could not write price record:', e));
+
     return newProduct;
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, `${PRODUCTS_COLLECTION}/${newId}`);
@@ -296,6 +314,28 @@ export async function saveDiscoveredProduct(product: Product): Promise<Product> 
   try {
     const productRef = doc(db, PRODUCTS_COLLECTION, product.id);
     await setDoc(productRef, product, { merge: true });
+
+    // Also persist individual vendor quotes to prices collection
+    if (product.vendors && product.vendors.length > 0) {
+      for (const v of product.vendors) {
+        const pId = `price-${product.id}-${v.id}`;
+        setDoc(doc(db, PRICES_COLLECTION, pId), {
+          id: pId,
+          productId: product.id,
+          vendorName: v.vendorName,
+          price: v.price,
+          currency: 'KES',
+          unit: v.unit || product.unit,
+          location: v.location || product.county,
+          county: product.county,
+          source: v.sourceType,
+          sourceUrl: v.sourceUrl || '',
+          collectedAt: v.dateCollected || 'Recent',
+          inStock: v.inStock !== false
+        }).catch(e => console.warn('Could not write vendor price record:', e));
+      }
+    }
+
     return product;
   } catch (error) {
     console.warn('Could not save discovered product to Firestore:', error);

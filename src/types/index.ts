@@ -19,6 +19,30 @@ export interface VendorPrice {
   notes?: string;
 }
 
+export interface PriceRecord {
+  id: string;
+  productId: string;
+  vendorId?: string;
+  vendorName: string;
+  price: number;
+  currency: 'KES';
+  unit: string;
+  location: string;
+  county?: string;
+  source: string;
+  sourceUrl?: string;
+  collectedAt: string;
+  inStock?: boolean;
+}
+
+export interface CategoryItem {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  subcategories?: string[];
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -83,6 +107,11 @@ export interface PriceFeedback {
 export interface SearchQueryAnalysis {
   rawQuery: string;
   itemQuery: string;
+  canonicalName?: string;
+  detectedCategory?: string;
+  detectedSubcategory?: string;
+  detectedBrand?: string;
+  detectedSize?: string;
   detectedLocation?: string;
   categoryFilter?: string;
 }
@@ -90,13 +119,18 @@ export interface SearchQueryAnalysis {
 export type CategoryKey = 
   | 'all'
   | 'groceries'
-  | 'household'
   | 'clothing'
-  | 'furniture'
+  | 'footwear'
+  | 'household'
+  | 'kitchen'
+  | 'personal_care'
   | 'electronics'
   | 'hardware'
+  | 'fitness'
+  | 'furniture'
   | 'automotive'
-  | 'beauty'
+  | 'baby'
+  | 'services'
   | 'housing'
   | 'transport'
-  | 'services';
+  | string;
