@@ -1,0 +1,77 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Products: readable by everyone in Kenya
+    match /products/{productId} {
+      allow get, list: if isValidId(productId) || true;
+
+      // Creation allows catalog seeding or community-added products
+      allow create: if isValidId(productId)
+        && incoming().name is string && incoming().name.size() > 0 && incoming().name.size() <= 150
+        && incoming().category is string && incoming().category.size() <= 64
+        && incoming().typicalPrice is number && incoming().typicalPrice > 0
+        && incoming().unit is string && incoming().unit.size() <= 32;
+
+      // Update allows catalog re-seeding, live discovery updates, or incrementing counters
+      allow update: if isValidId(productId)
+        && (
+          (incoming().name is string && incoming().name.size() > 0 && incoming().name.size() <= 150
+           && incoming().category is string && incoming().category.size() <= 64
+           && incoming().typicalPrice is number && incoming().typicalPrice > 0
+           && incoming().unit is string && incoming().unit.size() <= 32) ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['confirmsCount', 'outdatesCount', 'flaggedCount', 'reportsCount', 'updatedAt']) ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['reportsCount', 'minPrice', 'maxPrice', 'typicalPrice', 'updatedAt']) ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['confirmsCount', 'updatedAt']) ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['outdatesCount', 'updatedAt']) ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['flaggedCount', 'updatedAt']) ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['vendors', 'typicalPrice', 'minPrice', 'maxPrice', 'updatedAt', 'retailerOrSource', 'dateCollected'])
+        );
+      
+      allow delete: if false;
+    }
+
+    // Community Reports: user submissions of what they actually paid
+    match /reports/{reportId} {
+      allow get, list: if true;
+      allow create: if isValidId(reportId)
+        && incoming().productId is string && incoming().productId.size() <= 128
+        && incoming().reportedPrice is number && incoming().reportedPrice > 0
+        && incoming().county is string && incoming().county.size() <= 64;
+      allow update, delete: if false;
+    }
+
+    // Feedback (Confirm, Outdated, Report actions)
+    match /feedback/{feedbackId} {
+      allow get, list: if true;
+      allow create: if isValidId(feedbackId)
+        && incoming().productId is string && incoming().productId.size() <= 128
+        && incoming().actionType is string 
+        && incoming().actionType in ['confirm', 'outdated', 'report'];
+      allow update, delete: if false;
+    }
+
+    // Test connection doc
+    match /test/{testId} {
+      allow read: if true;
+    }
+  }
+}

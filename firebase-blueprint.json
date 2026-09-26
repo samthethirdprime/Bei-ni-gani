@@ -1,0 +1,277 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "A Kenyan product or service catalog item with typical and range pricing",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the product",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "description": "Standard English/Common name of the product or service",
+          "maxLength": 150
+        },
+        "swahiliName": {
+          "type": "string",
+          "description": "Swahili name or common Kenyan translation",
+          "maxLength": 150
+        },
+        "aliases": {
+          "type": "array",
+          "description": "Keywords, slang, and search alias terms"
+        },
+        "category": {
+          "type": "string",
+          "description": "General category (groceries, household, electronics, building, automotive, services, housing, transport, etc.)",
+          "maxLength": 64
+        },
+        "subcategory": {
+          "type": "string",
+          "description": "Subcategory name",
+          "maxLength": 64
+        },
+        "brand": {
+          "type": "string",
+          "description": "Brand or manufacturer if applicable",
+          "maxLength": 64
+        },
+        "sizeOrQuantity": {
+          "type": "string",
+          "description": "Package size or quantity description",
+          "maxLength": 64
+        },
+        "unit": {
+          "type": "string",
+          "description": "Unit of measurement (kg, piece, bag, liter, month, trip, service)",
+          "maxLength": 32
+        },
+        "image": {
+          "type": "string",
+          "description": "Product visual URL",
+          "maxLength": 1024
+        },
+        "typicalPrice": {
+          "type": "number",
+          "description": "Current typical benchmark price in KSh"
+        },
+        "minPrice": {
+          "type": "number",
+          "description": "Minimum observed price in KSh"
+        },
+        "maxPrice": {
+          "type": "number",
+          "description": "Maximum observed price in KSh"
+        },
+        "priceType": {
+          "type": "string",
+          "description": "Type of benchmark: MARKET_RETAIL, COMMUNITY_REPORT, or VERIFIED_OFFICIAL",
+          "maxLength": 32
+        },
+        "county": {
+          "type": "string",
+          "description": "Kenyan county (Nairobi, Mombasa, Kisumu, Kiambu, Nakuru, etc.)",
+          "maxLength": 64
+        },
+        "town": {
+          "type": "string",
+          "description": "Town or neighborhood",
+          "maxLength": 64
+        },
+        "area": {
+          "type": "string",
+          "description": "Specific area or market estate",
+          "maxLength": 64
+        },
+        "retailerOrSource": {
+          "type": "string",
+          "description": "Retailer, market or data source name",
+          "maxLength": 100
+        },
+        "dateCollected": {
+          "type": "string",
+          "description": "Date or relative date collected",
+          "maxLength": 64
+        },
+        "reportsCount": {
+          "type": "number",
+          "description": "Number of community reports logged"
+        },
+        "confirmsCount": {
+          "type": "number",
+          "description": "Number of user accuracy confirmations"
+        },
+        "outdatesCount": {
+          "type": "number",
+          "description": "Number of outdated flags"
+        },
+        "flaggedCount": {
+          "type": "number",
+          "description": "Number of problematic price reports"
+        },
+        "sourceUrl": {
+          "type": "string",
+          "description": "Public source link or retailer URL",
+          "maxLength": 1024
+        },
+        "description": {
+          "type": "string",
+          "description": "Contextual description and pricing notes",
+          "maxLength": 500
+        },
+        "isCommunityAdded": {
+          "type": "boolean",
+          "description": "Whether this item was submitted by a user"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp string",
+          "maxLength": 64
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp string",
+          "maxLength": 64
+        }
+      },
+      "required": ["name", "category", "unit", "typicalPrice"]
+    },
+    "CommunityReport": {
+      "title": "CommunityReport",
+      "description": "User submitted actual price paid for an item in Kenya",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of report",
+          "maxLength": 128
+        },
+        "productId": {
+          "type": "string",
+          "description": "Target product ID",
+          "maxLength": 128
+        },
+        "productName": {
+          "type": "string",
+          "description": "Product name at time of report",
+          "maxLength": 150
+        },
+        "reportedPrice": {
+          "type": "number",
+          "description": "Price in KSh paid by user"
+        },
+        "unit": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "maxLength": 32
+        },
+        "quantity": {
+          "type": "string",
+          "description": "Quantity purchased",
+          "maxLength": 64
+        },
+        "county": {
+          "type": "string",
+          "description": "County of purchase",
+          "maxLength": 64
+        },
+        "town": {
+          "type": "string",
+          "description": "Town or neighborhood",
+          "maxLength": 64
+        },
+        "area": {
+          "type": "string",
+          "description": "Area or specific stall/road",
+          "maxLength": 64
+        },
+        "storeName": {
+          "type": "string",
+          "description": "Store or seller name",
+          "maxLength": 100
+        },
+        "purchaseDate": {
+          "type": "string",
+          "description": "Date of transaction",
+          "maxLength": 64
+        },
+        "receiptUrl": {
+          "type": "string",
+          "description": "Optional receipt or photo URL",
+          "maxLength": 1024
+        },
+        "notes": {
+          "type": "string",
+          "description": "Additional remarks",
+          "maxLength": 300
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Submission timestamp",
+          "maxLength": 64
+        }
+      },
+      "required": ["productId", "reportedPrice", "county"]
+    },
+    "PriceFeedback": {
+      "title": "PriceFeedback",
+      "description": "User feedback action on a price (confirm, outdated, or issue report)",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Feedback ID",
+          "maxLength": 128
+        },
+        "productId": {
+          "type": "string",
+          "description": "Target product ID",
+          "maxLength": 128
+        },
+        "actionType": {
+          "type": "string",
+          "description": "confirm, outdated, or report",
+          "maxLength": 32
+        },
+        "reason": {
+          "type": "string",
+          "description": "Reason for report or feedback",
+          "maxLength": 200
+        },
+        "suggestedPrice": {
+          "type": "number",
+          "description": "Suggested current price if outdated"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp",
+          "maxLength": 64
+        }
+      },
+      "required": ["productId", "actionType"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": {
+        "$ref": "Product"
+      },
+      "description": "Master catalog of Kenyan goods and services with pricing ranges"
+    },
+    "/reports/{reportId}": {
+      "schema": {
+        "$ref": "CommunityReport"
+      },
+      "description": "Crowdsourced reports of what Kenyans actually paid"
+    },
+    "/feedback/{feedbackId}": {
+      "schema": {
+        "$ref": "PriceFeedback"
+      },
+      "description": "Confirmations, outdated notifications, and problem reports"
+    }
+  }
+}

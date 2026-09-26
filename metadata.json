@@ -1,0 +1,6 @@
+{
+  "name": "BEI GANI?",
+  "description": "Before unask bei, check bei. Find out what products and services cost in Kenya, compare prices, and report what you paid.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
