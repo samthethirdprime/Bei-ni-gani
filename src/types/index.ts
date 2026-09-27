@@ -51,6 +51,7 @@ export interface Product {
   category: string;
   subcategory?: string;
   brand?: string;
+  model?: string;
   sizeOrQuantity: string;
   unit: string;
   image: string;
@@ -107,12 +108,15 @@ export interface PriceFeedback {
 export interface SearchQueryAnalysis {
   rawQuery: string;
   itemQuery: string;
-  canonicalName?: string;
-  detectedCategory?: string;
-  detectedSubcategory?: string;
+  baseProduct?: string;
+  detectedVariant?: string;
   detectedBrand?: string;
   detectedSize?: string;
   detectedLocation?: string;
+  detectedCategory?: string;
+  detectedSubcategory?: string;
+  canonicalName?: string;
+  isBroadQuery?: boolean;
   categoryFilter?: string;
 }
 

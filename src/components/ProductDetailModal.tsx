@@ -15,7 +15,8 @@ import {
   ExternalLink,
   Share2,
   Copy,
-  MessageCircle
+  MessageCircle,
+  FileText
 } from 'lucide-react';
 import { Product, CommunityReport } from '../types';
 import { fetchReportsForProduct } from '../services/firebaseService';
@@ -31,6 +32,7 @@ interface ProductDetailModalProps {
   onOpenIPaidThis: (product: Product) => void;
   onRefreshLivePrices?: (product: Product) => Promise<void>;
   onShareToast?: (msg: string) => void;
+  onOpenWorkspaceModal?: (product: Product, mode: 'drive' | 'calendar') => void;
 }
 
 export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
@@ -41,7 +43,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onOpenReportModal,
   onOpenIPaidThis,
   onRefreshLivePrices,
-  onShareToast
+  onShareToast,
+  onOpenWorkspaceModal
 }) => {
   const [reports, setReports] = useState<CommunityReport[]>([]);
   const [loadingReports, setLoadingReports] = useState(false);
@@ -386,6 +389,41 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 ✓ Deep link copied to clipboard! Paste it into WhatsApp, Twitter/X, or SMS.
               </div>
             )}
+          </div>
+
+          {/* Google Workspace Integration Actions */}
+          <div className="bg-neutral-950/70 border border-neutral-800 rounded-2xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-blue-400" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-200">
+                  Google Workspace
+                </h4>
+              </div>
+              <span className="text-[11px] text-neutral-400">
+                Drive & Calendar Sync
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => onOpenWorkspaceModal?.(product, 'drive')}
+                className="py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 hover:border-blue-500/50 text-neutral-200 hover:text-white transition-all shadow-xs active:scale-95"
+              >
+                <FileText className="w-4 h-4 text-blue-400" />
+                <span>Save to Google Drive</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onOpenWorkspaceModal?.(product, 'calendar')}
+                className="py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 hover:border-amber-500/50 text-neutral-200 hover:text-white transition-all shadow-xs active:scale-95"
+              >
+                <Calendar className="w-4 h-4 text-amber-400" />
+                <span>Add to Google Calendar</span>
+              </button>
+            </div>
           </div>
 
           {/* Community Actions Row */}

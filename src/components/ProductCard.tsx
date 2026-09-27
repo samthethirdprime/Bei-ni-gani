@@ -97,14 +97,27 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400">
                 {product.category}
               </span>
-              {product.priceType === 'VERIFIED_OFFICIAL' && (
+              {product.brand && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-950/80 text-amber-300 border border-amber-800/60">
+                  {product.brand}
+                </span>
+              )}
+              {product.sizeOrQuantity && (
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-neutral-800 text-teal-300 border border-neutral-700/50">
+                  {product.sizeOrQuantity}
+                </span>
+              )}
+              {product.priceType === 'VERIFIED_OFFICIAL' ? (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/80 flex items-center gap-1">
                   <ShieldCheck className="w-3 h-3" /> Official
                 </span>
-              )}
-              {product.isRealtimeDiscovered && (
+              ) : product.verified || product.isRealtimeDiscovered ? (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-950 text-teal-300 border border-teal-800/80 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3" /> Live Verified
+                  <Sparkles className="w-3 h-3" /> Verified
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400 border border-neutral-700/60">
+                  Community
                 </span>
               )}
               {product.vendors && product.vendors.length > 1 && (
@@ -143,6 +156,22 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Vendor & Source Row */}
+        {product.retailerOrSource && (
+          <div className="mt-2 text-[11px] text-neutral-400 flex items-center justify-between gap-2">
+            <span className="truncate flex items-center gap-1.5 text-neutral-300">
+              <Store className="w-3.5 h-3.5 text-neutral-500 flex-shrink-0" />
+              <span className="truncate">{product.retailerOrSource}</span>
+            </span>
+            {product.dateCollected && (
+              <span className="flex-shrink-0 text-neutral-500 flex items-center gap-1 text-[10px]">
+                <Clock className="w-3 h-3" />
+                <span>{product.dateCollected}</span>
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Location & Metadata Bar */}
         <div className="mt-3 pt-2.5 border-t border-neutral-800/80 flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-400">

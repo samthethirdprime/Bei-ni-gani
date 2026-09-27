@@ -13,7 +13,8 @@ import {
   Database,
   Store,
   RefreshCw,
-  Loader2
+  Loader2,
+  Layers
 } from 'lucide-react';
 import { Product, CommunityReport, CategoryKey, SearchQueryAnalysis } from './types';
 import { INITIAL_PRODUCTS } from './services/catalogData';
@@ -38,6 +39,9 @@ import { AddItemModal } from './components/AddItemModal';
 import { ReportIssueModal } from './components/ReportIssueModal';
 import { FirebaseConfigGuideModal } from './components/FirebaseConfigGuideModal';
 import { LiveSearchScanner } from './components/LiveSearchScanner';
+import { StrictLocationBanner } from './components/StrictLocationBanner';
+import { ConnectedSourcesModal } from './components/ConnectedSourcesModal';
+import { WorkspaceModal } from './components/WorkspaceModal';
 
 export default function App() {
   // State
@@ -59,6 +63,8 @@ export default function App() {
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [addItemPrefill, setAddItemPrefill] = useState('');
   const [showFirebaseGuide, setShowFirebaseGuide] = useState(false);
+  const [showSourcesModal, setShowSourcesModal] = useState(false);
+  const [workspaceModal, setWorkspaceModal] = useState<{ product: Product; mode: 'drive' | 'calendar' } | null>(null);
 
   // Toast notifications
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -168,6 +174,91 @@ export default function App() {
   const searchResults = useMemo(() => {
     return searchProducts(products, searchQuery, selectedCategory, selectedCounty);
   }, [products, searchQuery, selectedCategory, selectedCounty]);
+
+  // Selected variant filter for broad queries
+  const [selectedVariantFilter, setSelectedVariantFilter] = useState<string>('all');
+
+  useEffect(() => {
+    setSelectedVariantFilter('all');
+  }, [searchQuery]);
+
+  // Calculate available variant chips for broad product search
+  const availableVariants = useMemo(() => {
+    if (!queryAnalysis.baseProduct || searchResults.length <= 1) return [];
+    const groups: { key: string; label: string; count: number; matcher: (p: Product) => boolean }[] = [];
+
+    if (queryAnalysis.baseProduct === 'sugar') {
+      const isWhite = (p: Product) => p.name.toLowerCase().includes('white') || p.aliases.some(a => a.includes('white'));
+      const isBrown = (p: Product) => (p.name.toLowerCase().includes('brown') || p.aliases.some(a => a.includes('brown'))) && !p.name.toLowerCase().includes('raw');
+      const isRaw = (p: Product) => p.name.toLowerCase().includes('raw') || p.name.toLowerCase().includes('demerara') || p.aliases.some(a => a.includes('raw'));
+      
+      const whiteCount = searchResults.filter(isWhite).length;
+      const brownCount = searchResults.filter(isBrown).length;
+      const rawCount = searchResults.filter(isRaw).length;
+      
+      if (whiteCount > 0) groups.push({ key: 'white', label: 'White Sugar', count: whiteCount, matcher: isWhite });
+      if (brownCount > 0) groups.push({ key: 'brown', label: 'Brown Sugar', count: brownCount, matcher: isBrown });
+      if (rawCount > 0) groups.push({ key: 'raw', label: 'Raw / Demerara', count: rawCount, matcher: isRaw });
+    } else if (queryAnalysis.baseProduct === 'rice') {
+      const isPishori = (p: Product) => p.name.toLowerCase().includes('pishori');
+      const isBasmati = (p: Product) => p.name.toLowerCase().includes('basmati');
+      const isSindano = (p: Product) => p.name.toLowerCase().includes('sindano');
+      
+      const pCount = searchResults.filter(isPishori).length;
+      const bCount = searchResults.filter(isBasmati).length;
+      const sCount = searchResults.filter(isSindano).length;
+
+      if (pCount > 0) groups.push({ key: 'pishori', label: 'Pishori Rice', count: pCount, matcher: isPishori });
+      if (bCount > 0) groups.push({ key: 'basmati', label: 'Basmati Rice', count: bCount, matcher: isBasmati });
+      if (sCount > 0) groups.push({ key: 'sindano', label: 'Sindano Rice', count: sCount, matcher: isSindano });
+    } else if (queryAnalysis.baseProduct === 'milk') {
+      const isFresh = (p: Product) => p.name.toLowerCase().includes('fresh') || p.unit.toLowerCase().includes('pouch');
+      const isUht = (p: Product) => p.name.toLowerCase().includes('uht') || p.name.toLowerCase().includes('long life');
+      const isMala = (p: Product) => p.name.toLowerCase().includes('mala') || p.name.toLowerCase().includes('lala');
+
+      const fCount = searchResults.filter(isFresh).length;
+      const uCount = searchResults.filter(isUht).length;
+      const mCount = searchResults.filter(isMala).length;
+
+      if (fCount > 0) groups.push({ key: 'fresh', label: 'Fresh Milk', count: fCount, matcher: isFresh });
+      if (uCount > 0) groups.push({ key: 'uht', label: 'UHT Long Life', count: uCount, matcher: isUht });
+      if (mCount > 0) groups.push({ key: 'mala', label: 'Fermented / Mala', count: mCount, matcher: isMala });
+    } else if (queryAnalysis.baseProduct === 'shoes') {
+      const isSchool = (p: Product) => p.name.toLowerCase().includes('toughees') || p.name.toLowerCase().includes('school');
+      const isLoafer = (p: Product) => p.name.toLowerCase().includes('loafer') || p.name.toLowerCase().includes('formal');
+      const isSneaker = (p: Product) => p.name.toLowerCase().includes('sneaker') || p.name.toLowerCase().includes('canvas');
+      const isBoot = (p: Product) => p.name.toLowerCase().includes('boot');
+
+      const scCount = searchResults.filter(isSchool).length;
+      const lCount = searchResults.filter(isLoafer).length;
+      const snCount = searchResults.filter(isSneaker).length;
+      const btCount = searchResults.filter(isBoot).length;
+
+      if (scCount > 0) groups.push({ key: 'school', label: 'School Shoes (Toughees)', count: scCount, matcher: isSchool });
+      if (lCount > 0) groups.push({ key: 'loafers', label: 'Formal Loafers', count: lCount, matcher: isLoafer });
+      if (snCount > 0) groups.push({ key: 'sneakers', label: 'Sneakers (Raba)', count: snCount, matcher: isSneaker });
+      if (btCount > 0) groups.push({ key: 'boots', label: 'Safari Boots', count: btCount, matcher: isBoot });
+    } else if (queryAnalysis.baseProduct === 'boxers') {
+      const isMen = (p: Product) => p.name.toLowerCase().includes('men') || p.name.toLowerCase().includes('boxer');
+      const isWomen = (p: Product) => p.name.toLowerCase().includes('women') || p.name.toLowerCase().includes('panties');
+
+      const mCount = searchResults.filter(isMen).length;
+      const wCount = searchResults.filter(isWomen).length;
+
+      if (mCount > 0) groups.push({ key: 'men', label: "Men's Boxers", count: mCount, matcher: isMen });
+      if (wCount > 0) groups.push({ key: 'women', label: "Women's Underwear", count: wCount, matcher: isWomen });
+    }
+
+    return groups;
+  }, [queryAnalysis.baseProduct, searchResults]);
+
+  // Displayed results after optional variant filter
+  const displayedResults = useMemo(() => {
+    if (selectedVariantFilter === 'all') return searchResults;
+    const group = availableVariants.find(g => g.key === selectedVariantFilter);
+    if (!group) return searchResults;
+    return searchResults.filter(group.matcher);
+  }, [searchResults, selectedVariantFilter, availableVariants]);
 
   // Perform Live Real-time Price Discovery across Kenyan sources
   const performLiveSearch = useCallback(async (queryToSearch: string) => {
@@ -378,6 +469,7 @@ export default function App() {
           setShowAddItemModal(true);
         }}
         onOpenFirebaseGuide={() => setShowFirebaseGuide(true)}
+        onOpenSources={() => setShowSourcesModal(true)}
         selectedCounty={selectedCounty}
         onSelectCounty={setSelectedCounty}
         productsCount={products.length}
@@ -487,8 +579,27 @@ export default function App() {
           </div>
         )}
 
-        {/* Live Search Scanning / Fallback Area */}
-        {(isLiveSearching || (searchResults.length === 0 && searchQuery.trim().length >= 2)) && (
+        {/* Strict Location Banner when 0 results in specified location */}
+        {searchResults.length === 0 && (selectedCounty || queryAnalysis.detectedLocation) && !isLiveSearching && (
+          <StrictLocationBanner
+            requestedLocation={selectedCounty || queryAnalysis.detectedLocation || ''}
+            itemQuery={queryAnalysis.itemQuery}
+            onSelectNearby={(area) => {
+              setSelectedCounty(area);
+            }}
+            onClearLocation={() => {
+              setSelectedCounty('');
+              setSearchQuery(queryAnalysis.itemQuery);
+            }}
+            onReportPrice={() => {
+              setAddItemPrefill(queryAnalysis.itemQuery);
+              setShowAddItemModal(true);
+            }}
+          />
+        )}
+
+        {/* Live Search Scanning / Fallback Area (when no strict location issue) */}
+        {(isLiveSearching || (searchResults.length === 0 && searchQuery.trim().length >= 2 && !(selectedCounty || queryAnalysis.detectedLocation))) && (
           <LiveSearchScanner
             query={searchQuery}
             identifiedName={queryAnalysis.canonicalName || queryAnalysis.itemQuery}
@@ -501,10 +612,45 @@ export default function App() {
           />
         )}
 
+        {/* Broad Query Variant Filter Tabs */}
+        {availableVariants.length > 0 && searchResults.length > 0 && (
+          <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-2.5 flex items-center gap-1.5 overflow-x-auto scrollbar-none text-xs">
+            <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider pl-1.5 pr-1 flex items-center gap-1 flex-shrink-0">
+              <Layers className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Variants:</span>
+            </span>
+
+            <button
+              onClick={() => setSelectedVariantFilter('all')}
+              className={`px-3 py-1.5 rounded-xl font-bold flex-shrink-0 transition-all ${
+                selectedVariantFilter === 'all'
+                  ? 'bg-emerald-500 text-neutral-950 shadow-md'
+                  : 'bg-neutral-800/80 hover:bg-neutral-800 text-neutral-300 hover:text-white'
+              }`}
+            >
+              All Variants ({searchResults.length})
+            </button>
+
+            {availableVariants.map((v) => (
+              <button
+                key={v.key}
+                onClick={() => setSelectedVariantFilter(v.key)}
+                className={`px-3 py-1.5 rounded-xl font-bold flex-shrink-0 transition-all ${
+                  selectedVariantFilter === v.key
+                    ? 'bg-emerald-500 text-neutral-950 shadow-md'
+                    : 'bg-neutral-800/80 hover:bg-neutral-800 text-neutral-300 hover:text-white'
+                }`}
+              >
+                {v.label} ({v.count})
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Product Cards Grid */}
-        {searchResults.length > 0 && (
+        {displayedResults.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {searchResults.map((product) => (
+            {displayedResults.map((product) => (
               <ProductCard
                 key={product.id}
                 product={product}
@@ -513,6 +659,19 @@ export default function App() {
                 onOpenReportModal={(p) => setIssueModalProduct({ product: p, mode: 'report' })}
               />
             ))}
+          </div>
+        )}
+
+        {/* When variant filter narrows to 0 items */}
+        {displayedResults.length === 0 && searchResults.length > 0 && (
+          <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-6 text-center text-xs text-neutral-400 space-y-2">
+            <p>No products found for the selected variant.</p>
+            <button
+              onClick={() => setSelectedVariantFilter('all')}
+              className="text-emerald-400 font-bold hover:underline"
+            >
+              Show all variants ({searchResults.length})
+            </button>
           </div>
         )}
 
@@ -560,6 +719,7 @@ export default function App() {
           onOpenIPaidThis={(p) => setPaidModalProduct(p)}
           onRefreshLivePrices={handleRefreshProductVendors}
           onShareToast={showToast}
+          onOpenWorkspaceModal={(p, mode) => setWorkspaceModal({ product: p, mode })}
         />
       )}
 
@@ -599,6 +759,23 @@ export default function App() {
       {showFirebaseGuide && (
         <FirebaseConfigGuideModal
           onClose={() => setShowFirebaseGuide(false)}
+        />
+      )}
+
+      {/* 6. Connected Sources Transparency Modal */}
+      <ConnectedSourcesModal
+        isOpen={showSourcesModal}
+        onClose={() => setShowSourcesModal(false)}
+      />
+
+      {/* 7. Google Workspace Modal (Drive & Calendar) */}
+      {workspaceModal && (
+        <WorkspaceModal
+          isOpen={!!workspaceModal}
+          product={workspaceModal.product}
+          mode={workspaceModal.mode}
+          onClose={() => setWorkspaceModal(null)}
+          onToast={showToast}
         />
       )}
     </div>

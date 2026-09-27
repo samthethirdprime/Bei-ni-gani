@@ -1,4 +1,7 @@
 import { Product, SearchQueryAnalysis, VendorPrice } from '../types';
+import { matchesStrictLocation } from './locationService';
+import { connectorRegistry } from './connectors/connectorRegistry';
+import { GroupedProductComparison } from './connectors/types';
 
 // Comprehensive Kenyan locations dictionary
 export const KENYAN_LOCATIONS: { [key: string]: { county: string; town?: string } } = {
@@ -305,19 +308,225 @@ export const CANONICAL_CONCEPTS: ConceptMapping[] = [
   }
 ];
 
+// Base Product Definitions for Universal Variant Matching
+export interface BaseProductVariant {
+  key: string;
+  name: string;
+  aliases: string[];
+}
+
+export interface BaseProductDef {
+  key: string;
+  name: string;
+  category: string;
+  subcategory: string;
+  aliases: string[];
+  variants: BaseProductVariant[];
+}
+
+export const BASE_PRODUCTS: BaseProductDef[] = [
+  {
+    key: 'sugar',
+    name: 'Sugar (Sukari)',
+    category: 'groceries',
+    subcategory: 'Pantry Staples',
+    aliases: ['sugar', 'sukari', 'white sugar', 'brown sugar', 'raw sugar', 'sukari ya chai', 'demerara'],
+    variants: [
+      { key: 'white', name: 'White Sugar', aliases: ['white', 'nyeupe', 'white sugar', 'sukari nyeupe'] },
+      { key: 'brown', name: 'Brown Sugar', aliases: ['brown', 'golden', 'brown sugar', 'sukari ya brown', 'sukari brown'] },
+      { key: 'raw', name: 'Raw / Demerara Sugar', aliases: ['raw', 'demerara', 'organic', 'unrefined', 'asilia'] },
+      { key: 'icing', name: 'Icing Sugar', aliases: ['icing', 'confectioners'] }
+    ]
+  },
+  {
+    key: 'rice',
+    name: 'Rice (Mchele)',
+    category: 'groceries',
+    subcategory: 'Rice & Grains',
+    aliases: ['rice', 'mchele', 'basmati', 'pishori', 'sindano', 'biryani rice'],
+    variants: [
+      { key: 'pishori', name: 'Pishori Rice', aliases: ['pishori', 'mwea', 'mwea pishori'] },
+      { key: 'basmati', name: 'Basmati Rice', aliases: ['basmati', 'daawat basmati'] },
+      { key: 'sindano', name: 'Sindano Rice', aliases: ['sindano', 'white rice', 'long grain'] },
+      { key: 'brown', name: 'Brown Rice', aliases: ['brown rice', 'brown basmati'] }
+    ]
+  },
+  {
+    key: 'milk',
+    name: 'Milk (Maziwa)',
+    category: 'groceries',
+    subcategory: 'Dairy & Milk',
+    aliases: ['milk', 'maziwa', 'fresh milk', 'uht milk', 'mala', 'lala'],
+    variants: [
+      { key: 'fresh', name: 'Fresh Milk', aliases: ['fresh', 'safi', 'pouch', 'fresh milk', 'maziwa safi'] },
+      { key: 'uht', name: 'UHT Long Life', aliases: ['uht', 'long life', 'carton', 'sanduku'] },
+      { key: 'mala', name: 'Mala / Lala', aliases: ['mala', 'lala', 'fermented', 'maziwa lala'] },
+      { key: 'lowfat', name: 'Low Fat / Skimmed', aliases: ['low fat', 'skimmed', 'light'] }
+    ]
+  },
+  {
+    key: 'shoes',
+    name: 'Shoes (Viatu)',
+    category: 'footwear',
+    subcategory: 'Shoes & Footwear',
+    aliases: ['shoes', 'viatu', 'sneakers', 'school shoes', 'loafers', 'boots', 'toughees', 'raba'],
+    variants: [
+      { key: 'school', name: 'School Shoes', aliases: ['school', 'toughees', 'viatu vya shule', 'shule'] },
+      { key: 'loafers', name: 'Formal Loafers', aliases: ['loafers', 'formal', 'official', 'leather shoes', 'dress shoes'] },
+      { key: 'sneakers', name: 'Sneakers', aliases: ['sneakers', 'sneaker', 'canvas', 'raba', 'casual'] },
+      { key: 'boots', name: 'Boots', aliases: ['boots', 'safari boots', 'boot'] }
+    ]
+  },
+  {
+    key: 'boxers',
+    name: 'Underwear / Boxers',
+    category: 'clothing',
+    subcategory: 'Underwear & Innerwear',
+    aliases: ['boxers', 'boxer', 'underwear', 'panties', 'panty', 'innerwear', 'briefs', 'suruali ya ndani', 'nguo za ndani'],
+    variants: [
+      { key: 'boxers', name: 'Boxers', aliases: ['boxers', 'boxer'] },
+      { key: 'panties', name: 'Panties', aliases: ['panties', 'panty'] },
+      { key: 'briefs', name: 'Briefs', aliases: ['briefs', 'kamisi'] }
+    ]
+  },
+  {
+    key: 'gas',
+    name: 'Cooking Gas (LPG)',
+    category: 'household',
+    subcategory: 'Cooking Gas & LPG',
+    aliases: ['gas', 'lpg', 'cooking gas', 'gesi', 'mtungi wa gas', 'gas refill'],
+    variants: [
+      { key: 'refill', name: 'Gas Refill', aliases: ['refill', 'kujaza', 'gas refill'] },
+      { key: 'complete', name: 'Complete Cylinder', aliases: ['complete', 'cylinder', 'mtungi kamili', 'new cylinder'] }
+    ]
+  },
+  {
+    key: 'watermelon',
+    name: 'Watermelon (Tikitimaji)',
+    category: 'groceries',
+    subcategory: 'Fruits & Vegetables',
+    aliases: ['watermelon', 'water melon', 'tikiti', 'tikitimaji', 'tikiti maji'],
+    variants: []
+  },
+  {
+    key: 'flour',
+    name: 'Flour (Unga)',
+    category: 'groceries',
+    subcategory: 'Pantry Staples',
+    aliases: ['flour', 'unga', 'maize flour', 'wheat flour', 'unga wa ugali', 'unga wa ngano'],
+    variants: [
+      { key: 'maize', name: 'Maize Meal (Ugali)', aliases: ['maize', 'ugali', 'mahindi', 'sifted'] },
+      { key: 'wheat', name: 'Wheat Flour (Ngano)', aliases: ['wheat', 'ngano', 'all purpose', 'chapo', 'mandazi'] },
+      { key: 'atta', name: 'Atta Whole Wheat', aliases: ['atta', 'brown wheat', 'whole wheat'] }
+    ]
+  },
+  {
+    key: 'oil',
+    name: 'Cooking Oil (Mafuta ya Kupikia)',
+    category: 'groceries',
+    subcategory: 'Pantry Staples',
+    aliases: ['cooking oil', 'mafuta ya kupikia', 'oil', 'mafuta', 'vegetable oil'],
+    variants: [
+      { key: 'liquid', name: 'Vegetable Oil', aliases: ['vegetable', 'liquid', 'fresh fri', 'rina', 'elianto'] },
+      { key: 'solid', name: 'Solid Cooking Fat', aliases: ['solid', 'fat', 'kimbo', 'kasuku', 'cowboy'] }
+    ]
+  },
+  {
+    key: 'bread',
+    name: 'Bread (Mkate)',
+    category: 'groceries',
+    subcategory: 'Bakery',
+    aliases: ['bread', 'mkate', 'supaloaf', 'broadways', 'festive'],
+    variants: [
+      { key: 'white', name: 'White Bread', aliases: ['white', 'white bread', 'mkate mweupe'] },
+      { key: 'brown', name: 'Brown Bread', aliases: ['brown', 'brown bread', 'wholemeal'] }
+    ]
+  },
+  {
+    key: 'chicken',
+    name: 'Chicken (Kuku)',
+    category: 'groceries',
+    subcategory: 'Poultry',
+    aliases: ['chicken', 'kuku', 'poultry'],
+    variants: [
+      { key: 'broiler', name: 'Broiler Chicken', aliases: ['broiler', 'dressed'] },
+      { key: 'kienyeji', name: 'Kienyeji Local Chicken', aliases: ['kienyeji', 'kienyeji kuku', 'indigenous'] }
+    ]
+  },
+  {
+    key: 'beef',
+    name: 'Beef (Nyama ya Ng\'ombe)',
+    category: 'groceries',
+    subcategory: 'Meat & Butchery',
+    aliases: ['beef', 'nyama', 'meat', "nyama ya ng'ombe", 'nyama ya ngombe', 'steak'],
+    variants: [
+      { key: 'steak', name: 'Boneless Steak', aliases: ['steak', 'boneless'] },
+      { key: 'bone', name: 'Beef with Bone', aliases: ['with bone', 'bone', 't-bone'] }
+    ]
+  },
+  {
+    key: 'smartphones',
+    name: 'Smartphones (Simu)',
+    category: 'electronics',
+    subcategory: 'Smartphones',
+    aliases: ['smartphone', 'smartphones', 'phone', 'simu', 'samsung', 'iphone', 'tecno', 'infinix', 'oppo', 'redmi'],
+    variants: [
+      { key: 'a56', name: 'Galaxy A56', aliases: ['a56', 'galaxy a56'] },
+      { key: 'a36', name: 'Galaxy A36', aliases: ['a36', 'galaxy a36'] },
+      { key: 'a55', name: 'Galaxy A55', aliases: ['a55', 'galaxy a55'] },
+      { key: 'case', name: 'Phone Case / Cover', aliases: ['case', 'cover', 'screen protector'] }
+    ]
+  },
+  {
+    key: 'bedsitters',
+    name: 'Bedsitters & Studios',
+    category: 'housing',
+    subcategory: 'Residential Rentals',
+    aliases: ['bedsitter', 'bedsitters', 'studio apartment', 'chumba', 'rental', 'single room'],
+    variants: []
+  },
+  {
+    key: 'barber',
+    name: 'Barber & Kinyozi',
+    category: 'services',
+    subcategory: 'Grooming & Hair',
+    aliases: ['barber', 'kinyozi', 'haircut', 'kunyoa', 'shave'],
+    variants: []
+  },
+  {
+    key: 'plumber',
+    name: 'Plumber & Pipe Repair',
+    category: 'services',
+    subcategory: 'Plumbing & Repairs',
+    aliases: ['plumber', 'fundi wa maji', 'fundi bomba', 'bomba'],
+    variants: []
+  },
+  {
+    key: 'electrician',
+    name: 'Electrician & Wiring',
+    category: 'services',
+    subcategory: 'Electrical & Wiring',
+    aliases: ['electrician', 'fundi wa stima', 'fundi stima', 'stima'],
+    variants: []
+  }
+];
+
 // Brand dictionary for Kenya
 const KNOWN_BRANDS = [
   'samsung', 'apple', 'iphone', 'tecno', 'infinix', 'xiaomi', 'oppo', 'nokia', 'sony', 'lg',
   'hp', 'dell', 'lenovo', 'asus', 'acer', 'macbook', 'jbl', 'ramtons', 'mika', 'bruhm', 'hisense',
   'bamburi', 'savannah', 'mombasa cement', 'blue triangle', 'dumuzas', 'totalenergies', 'total',
   'rubis', 'k-gas', 'afrigas', 'hashi', 'bobmil', 'superfoam', 'vitafoam', 'geisha', 'dettol',
-  'colgate', 'sensodyne', 'close up', 'nike', 'adidas', 'puma', 'bata', 'kiwi', 'menengai', 'bidco'
+  'colgate', 'sensodyne', 'close up', 'nike', 'adidas', 'puma', 'bata', 'kiwi', 'menengai', 'bidco',
+  'kabras', 'mumias', 'ndhiwa', 'nutrameal', 'daawat', 'sunrice', 'pearl', 'amana', 'brookside',
+  'kcc', 'ilara', 'tuzo', 'soko', 'jogoo', 'pembe', 'ajab', 'exe', 'fresh fri', 'rina', 'elianto',
+  'supaloaf', 'broadways', 'festive'
 ];
 
 // Size & Quantity patterns
 const SIZE_REGEX = /\b(\d+(?:\.\d+)?\s*(?:kg|g|litre|litres|l|ml|gb|mb|tb|inch|inches|cm|mm|m|ft|piece|pieces|pair|pairs|pack|set|tier|seater|seater|x\d+))\b/i;
 
-// Parse search input to separate query intent, location, brand, and size
+// Parse search input into a comprehensive extraction pipeline
 export function analyzeSearchQuery(rawQuery: string): SearchQueryAnalysis {
   let cleaned = cleanQuery(rawQuery);
 
@@ -367,33 +576,72 @@ export function analyzeSearchQuery(rawQuery: string): SearchQueryAnalysis {
     detectedSize = sizeMatch[0];
   }
 
-  // 6. Match Canonical everyday concepts
+  // 6. Match Base Product & Variants
+  let baseProduct: string | undefined;
+  let detectedVariant: string | undefined;
   let canonicalName: string | undefined;
   let detectedCategory: string | undefined;
   let detectedSubcategory: string | undefined;
 
-  for (const concept of CANONICAL_CONCEPTS) {
-    for (const alias of concept.aliases) {
-      const aliasClean = cleanQuery(alias);
-      if (cleaned === aliasClean || cleaned.startsWith(aliasClean + ' ') || cleaned.endsWith(' ' + aliasClean) || cleaned.includes(' ' + aliasClean + ' ')) {
-        canonicalName = concept.canonicalName;
-        detectedCategory = concept.category;
-        detectedSubcategory = concept.subcategory;
-        break;
+  for (const bp of BASE_PRODUCTS) {
+    const matchesBP = bp.aliases.some(alias => {
+      const aClean = cleanQuery(alias);
+      return cleaned === aClean || cleaned.startsWith(aClean + ' ') || cleaned.endsWith(' ' + aClean) || cleaned.includes(' ' + aClean + ' ');
+    });
+
+    if (matchesBP) {
+      baseProduct = bp.key;
+      canonicalName = bp.name;
+      detectedCategory = bp.category;
+      detectedSubcategory = bp.subcategory;
+
+      // Check if any specific variant of this base product is mentioned
+      for (const v of bp.variants) {
+        const matchesVariant = v.aliases.some(vAlias => {
+          const vaClean = cleanQuery(vAlias);
+          return cleaned.includes(vaClean);
+        });
+
+        if (matchesVariant) {
+          detectedVariant = v.key;
+          break;
+        }
       }
+      break;
     }
-    if (canonicalName) break;
   }
+
+  // Fallback to CANONICAL_CONCEPTS if not in BASE_PRODUCTS
+  if (!baseProduct) {
+    for (const concept of CANONICAL_CONCEPTS) {
+      for (const alias of concept.aliases) {
+        const aliasClean = cleanQuery(alias);
+        if (cleaned === aliasClean || cleaned.startsWith(aliasClean + ' ') || cleaned.endsWith(' ' + aliasClean) || cleaned.includes(' ' + aliasClean + ' ')) {
+          canonicalName = concept.canonicalName;
+          detectedCategory = concept.category;
+          detectedSubcategory = concept.subcategory;
+          break;
+        }
+      }
+      if (canonicalName) break;
+    }
+  }
+
+  // Determine if this is a broad query (e.g. user just searched "sugar", "rice", "shoes", without variant or size)
+  const isBroadQuery = Boolean(baseProduct && !detectedVariant && !detectedSize && !detectedBrand);
 
   return {
     rawQuery,
     itemQuery: cleaned,
-    canonicalName,
-    detectedCategory,
-    detectedSubcategory,
+    baseProduct,
+    detectedVariant,
     detectedBrand,
     detectedSize,
-    detectedLocation
+    detectedLocation,
+    detectedCategory,
+    detectedSubcategory,
+    canonicalName,
+    isBroadQuery
   };
 }
 
@@ -401,6 +649,15 @@ export function analyzeSearchQuery(rawQuery: string): SearchQueryAnalysis {
 export function getCanonicalVariants(text: string): string[] {
   const norm = cleanQuery(text);
   const variants = new Set<string>([norm]);
+
+  // Handle common typos & spelling variations in Kenya
+  if (norm.includes('sukaari')) variants.add(norm.replace('sukaari', 'sukari'));
+  if (norm.includes('kinozi')) variants.add(norm.replace('kinozi', 'kinyozi'));
+  if (norm.includes('toughies')) variants.add(norm.replace('toughies', 'toughees'));
+  if (norm.includes('ndiwa')) variants.add(norm.replace('ndiwa', 'ndhiwa'));
+  if (norm.includes('bed sitters')) variants.add(norm.replace('bed sitters', 'bedsitters'));
+  if (norm.includes('bed sitter')) variants.add(norm.replace('bed sitter', 'bedsitter'));
+  if (norm.includes('carwash')) variants.add(norm.replace('carwash', 'car wash'));
 
   // Handle compound words
   if (norm.includes('water melon')) variants.add(norm.replace('water melon', 'watermelon'));
@@ -410,9 +667,11 @@ export function getCanonicalVariants(text: string): string[] {
   if (norm.includes('boda boda')) variants.add(norm.replace('boda boda', 'bodaboda'));
   if (norm.includes('bodaboda')) variants.add(norm.replace('bodaboda', 'boda boda'));
 
-  // Swahili apostrophes
+  // Swahili apostrophes & spellings
   if (norm.includes("ng'ombe")) variants.add(norm.replace("ng'ombe", 'ngombe'));
   if (norm.includes('ngombe')) variants.add(norm.replace('ngombe', "ng'ombe"));
+  if (norm.includes('tikitimaji')) variants.add(norm.replace('tikitimaji', 'tikiti maji'));
+  if (norm.includes('tikiti maji')) variants.add(norm.replace('tikiti maji', 'tikitimaji'));
 
   // Match concept aliases
   for (const concept of CANONICAL_CONCEPTS) {
@@ -428,11 +687,15 @@ export function getCanonicalVariants(text: string): string[] {
   return Array.from(variants);
 }
 
-// Calculate match score between query and product
-export function calculateMatchScore(query: string, product: Product): number {
-  if (!query) return 100;
+// Calculate match score between query and product with full identity & variant awareness
+export function calculateMatchScore(queryOrAnalysis: string | SearchQueryAnalysis, product: Product): number {
+  const analysis: SearchQueryAnalysis = typeof queryOrAnalysis === 'string'
+    ? analyzeSearchQuery(queryOrAnalysis)
+    : queryOrAnalysis;
 
-  const cleanQ = cleanQuery(query);
+  const cleanQ = cleanQuery(analysis.itemQuery);
+  if (!cleanQ) return 100;
+
   const queryVariants = getCanonicalVariants(cleanQ);
 
   const prodName = cleanQuery(product.name);
@@ -441,46 +704,142 @@ export function calculateMatchScore(query: string, product: Product): number {
   const category = cleanQuery(product.category);
   const subcategory = cleanQuery(product.subcategory || '');
   const brand = cleanQuery(product.brand || '');
+  const sizeOrQty = cleanQuery(product.sizeOrQuantity || '');
+  const searchableAll = `${prodName} ${swaName} ${aliases.join(' ')} ${brand} ${sizeOrQty} ${product.unit}`.toLowerCase();
 
+  // =========================================================================
   // CRITICAL ANTI-COLLISION GUARDS:
+  // =========================================================================
+
   // 1. Watermelon must NEVER match bottled water / water tank / drinking water
   const isWatermelonQuery = cleanQ.includes('watermelon') || cleanQ.includes('water melon') || cleanQ.includes('tikiti');
-  const isBottledWaterProduct = prodName.includes('bottled water') || prodName.includes('mineral water') || prodName.includes('water tank');
+  const isBottledWaterProduct = prodName.includes('bottled water') || prodName.includes('mineral water') || prodName.includes('water tank') || prodName.includes('drinking water');
   if (isWatermelonQuery && isBottledWaterProduct) {
     return 0; // Absolute block
   }
-  const isWaterQuery = (cleanQ === 'water' || cleanQ === 'bottled water' || cleanQ === 'mineral water');
-  const isWatermelonProduct = prodName.includes('watermelon') || swaName.includes('tikiti');
+  const isWaterQuery = (cleanQ === 'water' || cleanQ === 'bottled water' || cleanQ === 'mineral water' || cleanQ === 'drinking water' || cleanQ === 'maji');
+  const isWatermelonProduct = prodName.includes('watermelon') || swaName.includes('tikiti') || aliases.some(a => a.includes('tikiti') || a.includes('watermelon'));
   if (isWaterQuery && isWatermelonProduct) {
     return 0; // Absolute block
   }
 
-  // 2. Shoe rack vs plain shoes:
-  const isShoeRackQuery = cleanQ.includes('shoe rack') || cleanQ.includes('shoerack') || cleanQ.includes('rack ya viatu');
-  const isPlainShoesProduct = (prodName.includes('shoes') || prodName.includes('sneakers')) && !prodName.includes('rack');
-  if (isShoeRackQuery && isPlainShoesProduct) {
+  // 2. Underwear / Boxers vs Boxing gloves / equipment:
+  const isBoxersQuery = /\b(boxer|boxers|underwear|innerwear|panties|panty|briefs|suruali ya ndani)\b/i.test(cleanQ);
+  const isBoxingSportProduct = /\b(boxing glove|boxing gloves|punching bag|boxing ring|boxing shorts)\b/i.test(prodName);
+  if (isBoxersQuery && isBoxingSportProduct) {
+    return 0;
+  }
+  const isBoxingQuery = /\b(boxing glove|boxing gloves|punching bag)\b/i.test(cleanQ);
+  const isInnerwearProduct = /\b(underwear|innerwear|boxers|panties|briefs|suruali ya ndani)\b/i.test(searchableAll);
+  if (isBoxingQuery && isInnerwearProduct) {
     return 0;
   }
 
-  // Exact Match Check (Highest Priority)
+  // 3. Shoe rack vs plain wearable shoes:
+  const isShoeRackQuery = cleanQ.includes('shoe rack') || cleanQ.includes('shoerack') || cleanQ.includes('rack ya viatu') || cleanQ.includes('shoe stand');
+  const isPlainShoesProduct = (prodName.includes('shoes') || prodName.includes('sneakers') || prodName.includes('toughees') || prodName.includes('loafers')) && !prodName.includes('rack');
+  if (isShoeRackQuery && isPlainShoesProduct) {
+    return 0;
+  }
+  const isPlainShoesQuery = (cleanQ === 'shoes' || cleanQ === 'viatu' || cleanQ === 'sneakers' || cleanQ === 'raba');
+  const isShoeRackProduct = prodName.includes('rack') || prodName.includes('stand') || category.includes('furniture');
+  if (isPlainShoesQuery && isShoeRackProduct) {
+    return 0; // User asked for shoes to wear, not a furniture shoe rack
+  }
+
+  // 4. Smartphone vs Phone Case / Screen Protector:
+  const userWantsAccessory = /\b(case|cover|protector|screen protector|cable|charger|chaja)\b/i.test(cleanQ);
+  const productIsAccessory = /\b(case|cover|protector|screen protector)\b/i.test(prodName);
+  if (!userWantsAccessory && productIsAccessory) {
+    return 0;
+  }
+  if (userWantsAccessory && !productIsAccessory && category === 'electronics') {
+    return 0;
+  }
+
+  // =========================================================================
+  // BASE PRODUCT LOGIC (Parent Category & Variant Rules)
+  // =========================================================================
+  if (analysis.baseProduct) {
+    const bp = BASE_PRODUCTS.find(b => b.key === analysis.baseProduct);
+    if (bp) {
+      // Check if this product belongs to the base product family
+      const belongsToBase = bp.aliases.some(alias => {
+        const aClean = cleanQuery(alias);
+        return prodName.includes(aClean) || swaName.includes(aClean) || aliases.some(a => a.includes(aClean));
+      }) || product.id.startsWith(`prod-${bp.key}`) || product.id.includes(bp.key);
+
+      if (belongsToBase) {
+        // A) SPECIFIC VARIANT NARROWING
+        // If a specific variant is requested (e.g. "brown sugar" -> 'brown'), narrow strictly!
+        if (analysis.detectedVariant) {
+          const requestedVariant = bp.variants.find(v => v.key === analysis.detectedVariant);
+          if (requestedVariant) {
+            const matchesReqVariant = requestedVariant.aliases.some(va => {
+              const vaClean = cleanQuery(va);
+              return searchableAll.includes(vaClean);
+            });
+
+            if (!matchesReqVariant) {
+              return 0; // Exclude products that do not match the specified variant!
+            }
+          }
+        }
+
+        // B) SPECIFIC SIZE NARROWING
+        // If a specific size is requested (e.g. "2kg brown sugar" -> '2kg'), narrow strictly!
+        if (analysis.detectedSize) {
+          const reqSizeNorm = analysis.detectedSize.toLowerCase().replace(/\s+/g, '');
+          const prodHasReqSize = searchableAll.replace(/\s+/g, '').includes(reqSizeNorm);
+
+          if (!prodHasReqSize) {
+            // Check for size collision (e.g. user asked for 2kg, product is 1kg)
+            const otherCommonSizes = ['1kg', '2kg', '500g', '5kg', '500ml', '1l', '1litre', '2l', '128gb', '256gb'];
+            const conflictingSize = otherCommonSizes.find(s => s !== reqSizeNorm && searchableAll.replace(/\s+/g, '').includes(s));
+            if (conflictingSize) {
+              return 0; // Strictly exclude conflicting sizes!
+            }
+          }
+        }
+
+        // C) SPECIFIC BRAND NARROWING
+        if (analysis.detectedBrand) {
+          const reqBrandClean = cleanQuery(analysis.detectedBrand);
+          if (!searchableAll.includes(reqBrandClean)) {
+            return 0; // Brand requested but doesn't match
+          }
+        }
+
+        // D) BROAD QUERY OR MATCHED VARIANT:
+        // Returns all relevant variants when broad (e.g. "sugar" returns white, brown, raw; "rice" returns pishori, basmati, sindano)
+        return 95;
+      }
+    }
+  }
+
+  // =========================================================================
+  // GENERAL MATCH SCORING (For items outside base products or specific queries)
+  // =========================================================================
+
+  // Exact Match Check
   for (const qv of queryVariants) {
     if (prodName === qv || swaName === qv || aliases.includes(qv)) {
       return 100;
     }
   }
 
-  // Substring Match in Name or Swahili Name with token boundary
+  // Substring Match with word boundary
   for (const qv of queryVariants) {
     if (qv.length >= 3) {
       const boundaryRegex = new RegExp(`(^|\\s)${qv}($|\\s)`);
-      if (boundaryRegex.test(prodName) || boundaryRegex.test(swaName)) {
+      if (boundaryRegex.test(prodName) || boundaryRegex.test(swaName) || aliases.some(a => boundaryRegex.test(a))) {
         return 90;
       }
     }
   }
 
   // Token-level accuracy guard
-  const queryTokens = cleanQ.split(/\s+/).filter(t => t.length > 1);
+  const queryTokens = cleanQ.split(/\s+/).filter(t => t.length > 1 && !['a', 'an', 'the', 'ya', 'wa', 'za', 'na', 'for', 'in', 'at'].includes(t));
   const allSearchableWords = [
     ...prodName.split(/\s+/),
     ...swaName.split(/\s+/),
@@ -508,7 +867,7 @@ export function calculateMatchScore(query: string, product: Product): number {
   return 0;
 }
 
-// Main Search Function
+// Main Search Function with Strict Location Enforcement
 export function searchProducts(
   products: Product[],
   rawQuery: string,
@@ -521,7 +880,14 @@ export function searchProducts(
 
   let candidates = products;
 
-  // 1. Filter by category if selected
+  // 1. Strict Location Filtering:
+  // If user searched "bedsitters Rongai" or selected Rongai, ONLY return items strictly matching Rongai.
+  // Never silently include Westlands, Kilimani, Nairobi CBD, etc.
+  if (targetLocation && targetLocation.toLowerCase() !== 'all' && targetLocation.toLowerCase() !== 'kenya') {
+    candidates = candidates.filter(p => matchesStrictLocation(p, targetLocation));
+  }
+
+  // 2. Filter by category if selected
   if (selectedCategory && selectedCategory !== 'all') {
     candidates = candidates.filter(p => {
       const pCat = p.category.toLowerCase().replace(/[^a-z]/g, '');
@@ -532,35 +898,14 @@ export function searchProducts(
 
   // If query is completely empty, return items sorted by confirms & reports
   if (!targetItem) {
-    if (targetLocation) {
-      return candidates.filter(p => 
-        p.county.toLowerCase().includes(targetLocation.toLowerCase()) ||
-        (p.town && p.town.toLowerCase().includes(targetLocation.toLowerCase())) ||
-        (p.area && p.area.toLowerCase().includes(targetLocation.toLowerCase()))
-      );
-    }
     return candidates;
   }
 
-  // 2. Score candidates strictly
+  // 3. Score candidates strictly with product identity matching
   const scored = candidates
     .map(product => {
-      const matchScore = calculateMatchScore(targetItem, product);
-      let locationBoost = 0;
-
-      if (targetLocation) {
-        const matchesLocation =
-          product.county.toLowerCase().includes(targetLocation.toLowerCase()) ||
-          (product.town && product.town.toLowerCase().includes(targetLocation.toLowerCase())) ||
-          (product.area && product.area.toLowerCase().includes(targetLocation.toLowerCase()));
-        
-        if (matchesLocation) {
-          locationBoost = 10;
-        }
-      }
-
-      const totalScore = matchScore > 0 ? matchScore + locationBoost : 0;
-      return { product, totalScore };
+      const matchScore = calculateMatchScore(analysis, product);
+      return { product, totalScore: matchScore };
     })
     .filter(item => item.totalScore >= 60)
     .sort((a, b) => b.totalScore - a.totalScore);
@@ -568,31 +913,103 @@ export function searchProducts(
   return scored.map(item => item.product);
 }
 
-// Real-time live dynamic search query to server backend
+// Convert GroupedProductComparison from Multi-Source Connectors to unified Product format
+export function convertGroupedToProduct(group: GroupedProductComparison, targetLocation?: string): Product {
+  const rep = group.listings[0];
+  const vendors: VendorPrice[] = group.listings.map((l, index) => ({
+    id: `v-conn-${index}-${Date.now()}`,
+    vendorName: l.vendor,
+    price: l.price,
+    unit: l.variant || 'unit',
+    location: l.location,
+    sourceType: l.sourceCategory === 'COMMUNITY' ? 'COMMUNITY' : (l.sourceCategory === 'SUPERMARKET' ? 'PHYSICAL_STORE' : 'ONLINE_RETAILER'),
+    sourceUrl: l.sourceUrl,
+    dateCollected: l.dateCollected,
+    inStock: l.availability !== 'OUT_OF_STOCK',
+    notes: l.notes || `Source: ${l.source} (${l.sourceMethod.replace('_', ' ')})`
+  }));
+
+  return {
+    id: `connector-${group.canonicalId}`,
+    name: group.productName,
+    brand: group.brand,
+    aliases: [group.productName.toLowerCase()],
+    category: group.category,
+    subcategory: group.subcategory,
+    sizeOrQuantity: group.variant || 'Standard',
+    unit: group.variant || 'unit',
+    image: group.image,
+    typicalPrice: group.typicalPrice,
+    minPrice: group.lowestPrice,
+    maxPrice: group.highestPrice,
+    priceType: 'MARKET_RETAIL',
+    county: rep.county || targetLocation || 'Kenya',
+    town: rep.town || rep.location,
+    area: rep.area || rep.location,
+    retailerOrSource: group.distinctVendors.slice(0, 3).join(', '),
+    dateCollected: 'Live Multi-Source Aggregation',
+    reportsCount: group.sourcesCount,
+    confirmsCount: 1,
+    outdatesCount: 0,
+    flaggedCount: 0,
+    sourceUrl: rep.sourceUrl,
+    description: `Price comparison aggregated across ${group.sourcesCount} verified Kenyan sources (${group.distinctVendors.join(', ')}). Lowest: KSh ${group.lowestPrice.toLocaleString()} | Highest: KSh ${group.highestPrice.toLocaleString()}.`,
+    isRealtimeDiscovered: true,
+    verified: true,
+    vendors,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+// Real-time live dynamic multi-source search query
 export async function searchRealtimePrice(
   rawQuery: string,
   county?: string,
   category?: string
 ): Promise<{ product: Product | null; verified: boolean; message?: string; sources?: string[] }> {
+  const analysis = analyzeSearchQuery(rawQuery);
+  const targetLocation = county || analysis.detectedLocation;
+
+  // 1. First, search connected Kenyan sources (Jumia, Kilimall, Jiji, Supermarkets, Official EPRA, Specialty Retailers, Community)
+  try {
+    const connectorResult = await connectorRegistry.searchAll(analysis, targetLocation, category);
+    if (connectorResult.groupedResults.primaryGroup && connectorResult.groupedResults.primaryGroup.listings.length > 0) {
+      const unifiedProduct = convertGroupedToProduct(connectorResult.groupedResults.primaryGroup, targetLocation);
+      return {
+        verified: true,
+        product: unifiedProduct,
+        sources: connectorResult.queriedSources
+      };
+    }
+  } catch (connectorErr) {
+    console.warn('Connector search encountered an issue, trying backend endpoint:', connectorErr);
+  }
+
+  // 2. Query server backend for live web discovery
   try {
     const res = await fetch('/api/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: rawQuery, county, category }),
+      body: JSON.stringify({ query: rawQuery, county: targetLocation, category }),
     });
 
-    if (!res.ok) {
-      throw new Error(`Server returned status ${res.status}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.verified && data.product) {
+        return data;
+      }
     }
-
-    const data = await res.json();
-    return data;
   } catch (err: any) {
-    console.warn('Realtime search call failed:', err);
-    return {
-      verified: false,
-      product: null,
-      message: "We couldn't connect to live search sources right now."
-    };
+    console.warn('Backend search API failed or offline:', err);
   }
+
+  // If no verified data found across connectors or live APIs
+  return {
+    verified: false,
+    product: null,
+    message: targetLocation 
+      ? `No verified results found in ${targetLocation}.`
+      : "No verified current price found."
+  };
 }
