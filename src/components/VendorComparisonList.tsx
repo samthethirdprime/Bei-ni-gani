@@ -1,6 +1,7 @@
 import React from 'react';
 import { Store, ExternalLink, MapPin, Clock, Tag, CheckCircle2, TrendingDown, ArrowUpRight, Sparkles, Loader2 } from 'lucide-react';
 import { Product, VendorPrice } from '../types';
+import { formatPrice } from '../services/currencyService';
 
 interface VendorComparisonListProps {
   product: Product;
@@ -91,7 +92,7 @@ export const VendorComparisonList: React.FC<VendorComparisonListProps> = ({
               Lowest
             </span>
             <span className="font-extrabold text-emerald-300 text-xs sm:text-sm">
-              KSh {lowestPrice.toLocaleString()}
+              {formatPrice(lowestPrice, product.currency || 'KES')}
             </span>
           </div>
 
@@ -100,7 +101,7 @@ export const VendorComparisonList: React.FC<VendorComparisonListProps> = ({
               Typical Range
             </span>
             <span className="font-bold text-neutral-200 text-xs">
-              KSh {lowestPrice.toLocaleString()} – {highestPrice.toLocaleString()}
+              {formatPrice(lowestPrice, product.currency || 'KES')} – {formatPrice(highestPrice, product.currency || 'KES')}
             </span>
           </div>
         </div>
@@ -162,12 +163,12 @@ export const VendorComparisonList: React.FC<VendorComparisonListProps> = ({
               <div className="flex items-center justify-between sm:justify-end gap-3 pt-1 sm:pt-0 border-t sm:border-t-0 border-neutral-800/60">
                 <div className="text-left sm:text-right">
                   <div className="text-base font-extrabold text-emerald-400">
-                    KSh {vendor.price.toLocaleString()}
+                    {formatPrice(vendor.price, vendor.currency || product.currency || 'KES')}
                     <span className="text-xs font-normal text-neutral-400"> / {vendor.unit || product.unit}</span>
                   </div>
                   {!isLowest && diffFromLowest > 0 && (
                     <div className="text-[10px] text-neutral-400">
-                      +KSh {diffFromLowest.toLocaleString()} vs lowest
+                      +{formatPrice(diffFromLowest, product.currency || 'KES')} vs lowest
                     </div>
                   )}
                 </div>

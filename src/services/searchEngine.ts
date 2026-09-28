@@ -3,46 +3,86 @@ import { matchesStrictLocation } from './locationService';
 import { connectorRegistry } from './connectors/connectorRegistry';
 import { GroupedProductComparison } from './connectors/types';
 
-// Comprehensive Kenyan locations dictionary
-export const KENYAN_LOCATIONS: { [key: string]: { county: string; town?: string } } = {
-  'rongai': { county: 'Kajiado', town: 'Ongata Rongai' },
-  'ongata rongai': { county: 'Kajiado', town: 'Ongata Rongai' },
-  'nairobi': { county: 'Nairobi', town: 'Nairobi' },
-  'mombasa': { county: 'Mombasa', town: 'Mombasa' },
-  'kisumu': { county: 'Kisumu', town: 'Kisumu' },
-  'nakuru': { county: 'Nakuru', town: 'Nakuru' },
-  'eldoret': { county: 'Uasin Gishu', town: 'Eldoret' },
-  'thika': { county: 'Kiambu', town: 'Thika' },
-  'kiambu': { county: 'Kiambu', town: 'Kiambu' },
-  'ruaka': { county: 'Kiambu', town: 'Ruaka' },
-  'ruiru': { county: 'Kiambu', town: 'Ruiru' },
-  'machakos': { county: 'Machakos', town: 'Machakos' },
-  'naivasha': { county: 'Nakuru', town: 'Naivasha' },
-  'ngong': { county: 'Kajiado', town: 'Ngong' },
-  'kitengela': { county: 'Kajiado', town: 'Kitengela' },
-  'syokimau': { county: 'Machakos', town: 'Syokimau' },
-  'eastleigh': { county: 'Nairobi', town: 'Eastleigh' },
-  'westlands': { county: 'Nairobi', town: 'Westlands' },
-  'karen': { county: 'Nairobi', town: 'Karen' },
-  'kasarani': { county: 'Nairobi', town: 'Kasarani' },
-  'roysambu': { county: 'Nairobi', town: 'Roysambu' },
-  'kilimani': { county: 'Nairobi', town: 'Kilimani' },
-  'south b': { county: 'Nairobi', town: 'South B' },
-  'south c': { county: 'Nairobi', town: 'South C' },
-  'pipeline': { county: 'Nairobi', town: 'Pipeline' },
-  'donholm': { county: 'Nairobi', town: 'Donholm' },
-  'kayole': { county: 'Nairobi', town: 'Kayole' },
-  'githurai': { county: 'Nairobi', town: 'Githurai' },
-  'kahawa': { county: 'Nairobi', town: 'Kahawa' },
-  'kahawa west': { county: 'Nairobi', town: 'Kahawa West' },
-  'umoja': { county: 'Nairobi', town: 'Umoja' },
-  'buruburu': { county: 'Nairobi', town: 'Buruburu' },
-  'nyali': { county: 'Mombasa', town: 'Nyali' },
-  'bamburi': { county: 'Mombasa', town: 'Bamburi' },
-  'mtwapa': { county: 'Kilifi', town: 'Mtwapa' },
-  'diani': { county: 'Kwale', town: 'Diani' },
-  'kondele': { county: 'Kisumu', town: 'Kondele' }
+// Comprehensive Worldwide & Kenyan locations dictionary
+export const WORLDWIDE_LOCATIONS: { [key: string]: { country: string; county: string; town?: string } } = {
+  // Kenyan Hubs & 47 Counties
+  'rongai': { country: 'Kenya', county: 'Kajiado', town: 'Ongata Rongai' },
+  'ongata rongai': { country: 'Kenya', county: 'Kajiado', town: 'Ongata Rongai' },
+  'nairobi': { country: 'Kenya', county: 'Nairobi', town: 'Nairobi' },
+  'mombasa': { country: 'Kenya', county: 'Mombasa', town: 'Mombasa' },
+  'kisumu': { country: 'Kenya', county: 'Kisumu', town: 'Kisumu' },
+  'nakuru': { country: 'Kenya', county: 'Nakuru', town: 'Nakuru' },
+  'eldoret': { country: 'Kenya', county: 'Uasin Gishu', town: 'Eldoret' },
+  'thika': { country: 'Kenya', county: 'Kiambu', town: 'Thika' },
+  'kiambu': { country: 'Kenya', county: 'Kiambu', town: 'Kiambu' },
+  'ruaka': { country: 'Kenya', county: 'Kiambu', town: 'Ruaka' },
+  'ruiru': { country: 'Kenya', county: 'Kiambu', town: 'Ruiru' },
+  'machakos': { country: 'Kenya', county: 'Machakos', town: 'Machakos' },
+  'naivasha': { country: 'Kenya', county: 'Nakuru', town: 'Naivasha' },
+  'ngong': { country: 'Kenya', county: 'Kajiado', town: 'Ngong' },
+  'kitengela': { country: 'Kenya', county: 'Kajiado', town: 'Kitengela' },
+  'syokimau': { country: 'Kenya', county: 'Machakos', town: 'Syokimau' },
+  'eastleigh': { country: 'Kenya', county: 'Nairobi', town: 'Eastleigh' },
+  'westlands': { country: 'Kenya', county: 'Nairobi', town: 'Westlands' },
+  'karen': { country: 'Kenya', county: 'Nairobi', town: 'Karen' },
+  'kasarani': { country: 'Kenya', county: 'Nairobi', town: 'Kasarani' },
+  'roysambu': { country: 'Kenya', county: 'Nairobi', town: 'Roysambu' },
+  'kilimani': { country: 'Kenya', county: 'Nairobi', town: 'Kilimani' },
+  'south b': { country: 'Kenya', county: 'Nairobi', town: 'South B' },
+  'south c': { country: 'Kenya', county: 'Nairobi', town: 'South C' },
+  'pipeline': { country: 'Kenya', county: 'Nairobi', town: 'Pipeline' },
+  'donholm': { country: 'Kenya', county: 'Nairobi', town: 'Donholm' },
+  'kayole': { country: 'Kenya', county: 'Nairobi', town: 'Kayole' },
+  'githurai': { country: 'Kenya', county: 'Nairobi', town: 'Githurai' },
+  'kahawa': { country: 'Kenya', county: 'Nairobi', town: 'Kahawa' },
+  'kahawa west': { country: 'Kenya', county: 'Nairobi', town: 'Kahawa West' },
+  'umoja': { country: 'Kenya', county: 'Nairobi', town: 'Umoja' },
+  'buruburu': { country: 'Kenya', county: 'Nairobi', town: 'Buruburu' },
+  'nyali': { country: 'Kenya', county: 'Mombasa', town: 'Nyali' },
+  'bamburi': { country: 'Kenya', county: 'Mombasa', town: 'Bamburi' },
+  'mtwapa': { country: 'Kenya', county: 'Kilifi', town: 'Mtwapa' },
+  'diani': { country: 'Kenya', county: 'Kwale', town: 'Diani' },
+  'kondele': { country: 'Kenya', county: 'Kisumu', town: 'Kondele' },
+  'nyeri': { country: 'Kenya', county: 'Nyeri', town: 'Nyeri' },
+  'meru': { country: 'Kenya', county: 'Meru', town: 'Meru' },
+  'kakamega': { country: 'Kenya', county: 'Kakamega', town: 'Kakamega' },
+  'kericho': { country: 'Kenya', county: 'Kericho', town: 'Kericho' },
+  'kisii': { country: 'Kenya', county: 'Kisii', town: 'Kisii' },
+  'garissa': { country: 'Kenya', county: 'Garissa', town: 'Garissa' },
+  'kilifi': { country: 'Kenya', county: 'Kilifi', town: 'Kilifi' },
+
+  // Worldwide Hubs
+  'los angeles': { country: 'United States', county: 'California', town: 'Los Angeles' },
+  'la': { country: 'United States', county: 'California', town: 'Los Angeles' },
+  'california': { country: 'United States', county: 'California', town: 'California' },
+  'new york': { country: 'United States', county: 'New York', town: 'New York City' },
+  'nyc': { country: 'United States', county: 'New York', town: 'New York City' },
+  'manhattan': { country: 'United States', county: 'New York', town: 'Manhattan' },
+  'brooklyn': { country: 'United States', county: 'New York', town: 'Brooklyn' },
+  'texas': { country: 'United States', county: 'Texas', town: 'Houston' },
+  'houston': { country: 'United States', county: 'Texas', town: 'Houston' },
+  'miami': { country: 'United States', county: 'Florida', town: 'Miami' },
+  'chicago': { country: 'United States', county: 'Illinois', town: 'Chicago' },
+  'london': { country: 'United Kingdom', county: 'England', town: 'London' },
+  'manchester': { country: 'United Kingdom', county: 'England', town: 'Manchester' },
+  'birmingham': { country: 'United Kingdom', county: 'England', town: 'Birmingham' },
+  'lagos': { country: 'Nigeria', county: 'Lagos State', town: 'Lagos' },
+  'abuja': { country: 'Nigeria', county: 'Abuja FCT', town: 'Abuja' },
+  'ikeja': { country: 'Nigeria', county: 'Lagos State', town: 'Ikeja' },
+  'johannesburg': { country: 'South Africa', county: 'Gauteng', town: 'Johannesburg' },
+  'sandton': { country: 'South Africa', county: 'Gauteng', town: 'Sandton' },
+  'cape town': { country: 'South Africa', county: 'Western Cape', town: 'Cape Town' },
+  'toronto': { country: 'Canada', county: 'Ontario', town: 'Toronto' },
+  'vancouver': { country: 'Canada', county: 'British Columbia', town: 'Vancouver' },
+  'sydney': { country: 'Australia', county: 'New South Wales', town: 'Sydney' },
+  'melbourne': { country: 'Australia', county: 'Victoria', town: 'Melbourne' },
+  'dubai': { country: 'United Arab Emirates', county: 'Dubai', town: 'Dubai' },
+  'kampala': { country: 'Uganda', county: 'Central', town: 'Kampala' },
+  'dar es salaam': { country: 'Tanzania', county: 'Dar es Salaam', town: 'Dar es Salaam' },
+  'kigali': { country: 'Rwanda', county: 'Kigali City', town: 'Kigali' }
 };
+
+export const KENYAN_LOCATIONS = WORLDWIDE_LOCATIONS;
 
 // Kenyan and English Natural Language query inquiry prefixes
 const QUERY_PREFIXES = [
@@ -508,6 +548,75 @@ export const BASE_PRODUCTS: BaseProductDef[] = [
     subcategory: 'Electrical & Wiring',
     aliases: ['electrician', 'fundi wa stima', 'fundi stima', 'stima'],
     variants: []
+  },
+  {
+    key: 'dumbbells',
+    name: 'Dumbbells & Weights',
+    category: 'fitness',
+    subcategory: 'Free Weights',
+    aliases: ['dumbbells', 'dumbbell', 'weights', 'hex dumbbells', 'hand weights', 'adjustable dumbbells'],
+    variants: [
+      { key: '10kg', name: '10kg Dumbbells', aliases: ['10kg', '10 kg'] },
+      { key: '5kg', name: '5kg Dumbbells', aliases: ['5kg', '5 kg'] },
+      { key: '15kg', name: '15kg Dumbbells', aliases: ['15kg', '15 kg'] },
+      { key: '20kg', name: '20kg Dumbbells', aliases: ['20kg', '20 kg'] },
+      { key: 'adjustable', name: 'Adjustable Dumbbells', aliases: ['adjustable', 'dial'] }
+    ]
+  },
+  {
+    key: 'treadmill',
+    name: 'Treadmills & Cardio',
+    category: 'fitness',
+    subcategory: 'Cardio Machines',
+    aliases: ['treadmill', 'treadmills', 'running machine', 'mashine ya kukimbia', 'running treadmill'],
+    variants: [
+      { key: 'motorized', name: 'Motorized Treadmill', aliases: ['motorized', 'electric'] },
+      { key: 'manual', name: 'Manual Curved Treadmill', aliases: ['manual', 'curved'] }
+    ]
+  },
+  {
+    key: 'resistance_bands',
+    name: 'Resistance Bands',
+    category: 'fitness',
+    subcategory: 'Resistance Training',
+    aliases: ['resistance bands', 'resistance band', 'exercise bands', 'workout bands', 'loop bands'],
+    variants: []
+  },
+  {
+    key: 'pullup_bar',
+    name: 'Pull-Up & Chin-Up Bars',
+    category: 'fitness',
+    subcategory: 'Calisthenics',
+    aliases: ['pull up bar', 'pullup bar', 'chin up bar', 'doorway pull up bar'],
+    variants: []
+  },
+  {
+    key: 'yoga_mat',
+    name: 'Yoga & Exercise Mats',
+    category: 'fitness',
+    subcategory: 'Yoga & Pilates',
+    aliases: ['yoga mat', 'exercise mat', 'gym mat', 'mkeka wa yoga'],
+    variants: []
+  },
+  {
+    key: 'boxing_gloves',
+    name: 'Boxing Gloves & Combat Gear',
+    category: 'fitness',
+    subcategory: 'Combat Sports',
+    aliases: ['boxing gloves', 'gloves za ndondi', 'boxing', 'punching gloves', 'everlast'],
+    variants: []
+  },
+  {
+    key: 'apartments',
+    name: 'Apartments & Rentals',
+    category: 'housing',
+    subcategory: 'Residential Rentals',
+    aliases: ['apartment', 'apartments', 'one bedroom', '1 bedroom', '2 bedroom', 'house rent', 'flat'],
+    variants: [
+      { key: '1bed', name: '1 Bedroom', aliases: ['1 bedroom', 'one bedroom', 'chumba kimoja'] },
+      { key: '2bed', name: '2 Bedroom', aliases: ['2 bedroom', 'two bedroom', 'vyumba viwili'] },
+      { key: 'studio', name: 'Studio / Bedsitter', aliases: ['studio', 'bedsitter'] }
+    ]
   }
 ];
 
@@ -548,12 +657,22 @@ export function analyzeSearchQuery(rawQuery: string): SearchQueryAnalysis {
 
   // 3. Extract location mentions
   let detectedLocation: string | undefined;
-  const sortedLocations = Object.keys(KENYAN_LOCATIONS).sort((a, b) => b.length - a.length);
+  let detectedCountry: string | undefined;
+  let detectedRegion: string | undefined;
+  let detectedCity: string | undefined;
+  let detectedArea: string | undefined;
+
+  const sortedLocations = Object.keys(WORLDWIDE_LOCATIONS).sort((a, b) => b.length - a.length);
 
   for (const locKey of sortedLocations) {
     const regex = new RegExp(`\\b${locKey}\\b`, 'i');
     if (regex.test(cleaned)) {
-      detectedLocation = KENYAN_LOCATIONS[locKey].town || KENYAN_LOCATIONS[locKey].county;
+      const locInfo = WORLDWIDE_LOCATIONS[locKey];
+      detectedLocation = locInfo.town || locInfo.county;
+      detectedCountry = locInfo.country;
+      detectedRegion = locInfo.county;
+      detectedCity = locInfo.town;
+      detectedArea = locInfo.town;
       cleaned = cleaned.replace(regex, '').replace(/\s+/g, ' ').trim();
       break;
     }

@@ -14,7 +14,8 @@ import {
   Store,
   RefreshCw,
   Loader2,
-  Layers
+  Layers,
+  MapPin
 } from 'lucide-react';
 import { Product, CommunityReport, CategoryKey, SearchQueryAnalysis } from './types';
 import { INITIAL_PRODUCTS } from './services/catalogData';
@@ -42,13 +43,15 @@ import { LiveSearchScanner } from './components/LiveSearchScanner';
 import { StrictLocationBanner } from './components/StrictLocationBanner';
 import { ConnectedSourcesModal } from './components/ConnectedSourcesModal';
 import { WorkspaceModal } from './components/WorkspaceModal';
+import { LocationSelector } from './components/LocationSelector';
 
 export default function App() {
   // State
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey>('all');
-  const [selectedCounty, setSelectedCounty] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState('');
+  const [showLocationModal, setShowLocationModal] = useState(false);
   
   // Real-time Discovery State
   const [isLiveSearching, setIsLiveSearching] = useState(false);
@@ -172,8 +175,8 @@ export default function App() {
 
   // Filtered & accurately matched products from internal catalog
   const searchResults = useMemo(() => {
-    return searchProducts(products, searchQuery, selectedCategory, selectedCounty);
-  }, [products, searchQuery, selectedCategory, selectedCounty]);
+    return searchProducts(products, searchQuery, selectedCategory, selectedLocation);
+  }, [products, searchQuery, selectedCategory, selectedLocation]);
 
   // Selected variant filter for broad queries
   const [selectedVariantFilter, setSelectedVariantFilter] = useState<string>('all');
@@ -273,7 +276,7 @@ export default function App() {
     try {
       const result = await searchRealtimePrice(
         trimmed, 
-        selectedCounty || queryAnalysis.detectedLocation, 
+        selectedLocation || queryAnalysis.detectedLocation, 
         selectedCategory !== 'all' ? selectedCategory : undefined
       );
 
@@ -302,7 +305,7 @@ export default function App() {
       setLiveSearchFailed(true);
       setLiveSearchFailedMessage("We couldn't find a verified current price for this item.");
     }
-  }, [selectedCounty, selectedCategory, queryAnalysis.detectedLocation]);
+  }, [selectedLocation, selectedCategory, queryAnalysis.detectedLocation]);
 
   // Auto-trigger live search if no internal results found (with debouncing)
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -470,8 +473,10 @@ export default function App() {
         }}
         onOpenFirebaseGuide={() => setShowFirebaseGuide(true)}
         onOpenSources={() => setShowSourcesModal(true)}
-        selectedCounty={selectedCounty}
-        onSelectCounty={setSelectedCounty}
+        selectedLocation={selectedLocation}
+        selectedCounty={selectedLocation}
+        onOpenLocationModal={() => setShowLocationModal(true)}
+        onSelectCounty={setSelectedLocation}
         productsCount={products.length}
       />
 
@@ -507,6 +512,8 @@ export default function App() {
             onSelectExample={handleSelectExample}
             isSearching={isLiveSearching}
             onSearchSubmit={() => performLiveSearch(searchQuery)}
+            selectedLocation={selectedLocation}
+            onOpenLocationModal={() => setShowLocationModal(true)}
           />
         </section>
 
@@ -537,22 +544,52 @@ export default function App() {
               </span>
             )}
 
-            {selectedCounty && (
-              <span className="bg-emerald-950/60 text-emerald-400 border border-emerald-800/60 px-2 py-0.5 rounded-full text-[11px] font-semibold">
-                📍 {selectedCounty}
-              </span>
+            {/* Clickable Location Badge */}
+            {selectedLocation ? (
+              <button
+                type="button"
+                onClick={() => setShowLocationModal(true)}
+                className="bg-emerald-950/80 hover:bg-emerald-900 text-emerald-400 border border-emerald-800/80 px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                title="Click to change location filter"
+              >
+                <MapPin className="w-3 h-3 text-emerald-400" />
+                <span>📍 {selectedLocation}</span>
+                <span
+                  role="button"
+                  aria-label="Clear location filter"
+                  className="text-emerald-400 hover:text-white ml-0.5 px-1 rounded hover:bg-emerald-800/60 cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedLocation('');
+                  }}
+                  title="Clear location filter"
+                >
+                  ✕
+                </span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowLocationModal(true)}
+                className="bg-neutral-900/90 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 hover:border-neutral-700 px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Filter by Country, County, City or Area"
+              >
+                <MapPin className="w-3 h-3 text-emerald-400" />
+                <span>Worldwide</span>
+              </button>
             )}
           </div>
 
-          {(searchQuery || selectedCategory !== 'all' || selectedCounty) && (
+          {(searchQuery || selectedCategory !== 'all' || selectedLocation) && (
             <button
+              type="button"
               onClick={() => {
                 setSearchQuery('');
                 setSelectedCategory('all');
-                setSelectedCounty('');
+                setSelectedLocation('');
                 setLiveSearchFailed(false);
               }}
-              className="text-emerald-400 hover:text-emerald-300 font-semibold text-xs"
+              className="text-emerald-400 hover:text-emerald-300 font-semibold text-xs cursor-pointer"
             >
               Reset Filters
             </button>
@@ -571,7 +608,7 @@ export default function App() {
 
             <button
               onClick={() => performLiveSearch(searchQuery)}
-              className="flex-shrink-0 px-3 py-1.5 rounded-xl bg-emerald-950 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-300 font-bold flex items-center gap-1.5 transition-all active:scale-95"
+              className="flex-shrink-0 px-3 py-1.5 rounded-xl bg-emerald-950 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-300 font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
             >
               <Store className="w-3.5 h-3.5 text-amber-400" />
               <span>Scan More Sources</span>
@@ -580,26 +617,27 @@ export default function App() {
         )}
 
         {/* Strict Location Banner when 0 results in specified location */}
-        {searchResults.length === 0 && (selectedCounty || queryAnalysis.detectedLocation) && !isLiveSearching && (
+        {searchResults.length === 0 && (selectedLocation || queryAnalysis.detectedLocation) && !isLiveSearching && (
           <StrictLocationBanner
-            requestedLocation={selectedCounty || queryAnalysis.detectedLocation || ''}
+            requestedLocation={selectedLocation || queryAnalysis.detectedLocation || ''}
             itemQuery={queryAnalysis.itemQuery}
             onSelectNearby={(area) => {
-              setSelectedCounty(area);
+              setSelectedLocation(area);
             }}
             onClearLocation={() => {
-              setSelectedCounty('');
+              setSelectedLocation('');
               setSearchQuery(queryAnalysis.itemQuery);
             }}
             onReportPrice={() => {
               setAddItemPrefill(queryAnalysis.itemQuery);
               setShowAddItemModal(true);
             }}
+            onOpenLocationModal={() => setShowLocationModal(true)}
           />
         )}
 
         {/* Live Search Scanning / Fallback Area (when no strict location issue) */}
-        {(isLiveSearching || (searchResults.length === 0 && searchQuery.trim().length >= 2 && !(selectedCounty || queryAnalysis.detectedLocation))) && (
+        {(isLiveSearching || (searchResults.length === 0 && searchQuery.trim().length >= 2 && !(selectedLocation || queryAnalysis.detectedLocation))) && (
           <LiveSearchScanner
             query={searchQuery}
             identifiedName={queryAnalysis.canonicalName || queryAnalysis.itemQuery}
@@ -778,6 +816,16 @@ export default function App() {
           onToast={showToast}
         />
       )}
+
+      {/* 8. Worldwide & Kenyan Location Filter Selector Modal */}
+      <LocationSelector
+        isOpen={showLocationModal}
+        onClose={() => setShowLocationModal(false)}
+        selectedLocation={selectedLocation}
+        onSelectLocation={(locStr) => {
+          setSelectedLocation(locStr);
+        }}
+      />
     </div>
   );
 }

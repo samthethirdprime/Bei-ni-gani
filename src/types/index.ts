@@ -1,17 +1,32 @@
 export type PriceType = 'MARKET_RETAIL' | 'COMMUNITY_REPORT' | 'VERIFIED_OFFICIAL';
 
+export interface StructuredLocation {
+  country?: string; // e.g. "Kenya", "United States", "United Kingdom", "Worldwide"
+  countryCode?: string; // "KE", "US", "GB", "GLOBAL", etc.
+  region?: string; // state/province/county/governorate
+  city?: string; // city/town
+  area?: string; // district/sub-county/neighborhood/estate
+  rawText?: string; // formatted text e.g. "Kenya → Nairobi → Westlands"
+}
+
 export interface LocationInfo {
+  country?: string;
   county: string;
+  stateOrProvince?: string;
   town?: string;
+  cityOrTown?: string;
   area?: string;
+  neighborhoodOrArea?: string;
 }
 
 export interface VendorPrice {
   id: string;
   vendorName: string;
   price: number;
+  currency?: string;
   unit: string;
   location: string;
+  country?: string;
   sourceType: 'ONLINE_RETAILER' | 'PHYSICAL_STORE' | 'MARKET_STALL' | 'OFFICIAL' | 'COMMUNITY';
   sourceUrl?: string;
   dateCollected: string;
@@ -25,10 +40,11 @@ export interface PriceRecord {
   vendorId?: string;
   vendorName: string;
   price: number;
-  currency: 'KES';
+  currency: string;
   unit: string;
   location: string;
   county?: string;
+  country?: string;
   source: string;
   sourceUrl?: string;
   collectedAt: string;
@@ -58,10 +74,12 @@ export interface Product {
   typicalPrice: number;
   minPrice: number;
   maxPrice: number;
+  currency?: string; // 'KES' | 'USD' | 'GBP' | 'EUR' | 'NGN' | 'ZAR' | etc. Defaults to 'KES'
   priceType: PriceType;
-  county: string;
-  town?: string;
-  area?: string;
+  country?: string; // 'Kenya', 'United States', 'United Kingdom', etc.
+  county: string; // state/county/province
+  town?: string; // city/town
+  area?: string; // neighborhood/estate/district
   retailerOrSource: string;
   dateCollected: string;
   reportsCount: number;
@@ -83,8 +101,10 @@ export interface CommunityReport {
   productId: string;
   productName: string;
   reportedPrice: number;
+  currency?: string;
   unit: string;
   quantity: string;
+  country?: string;
   county: string;
   town?: string;
   area?: string;
@@ -113,6 +133,10 @@ export interface SearchQueryAnalysis {
   detectedBrand?: string;
   detectedSize?: string;
   detectedLocation?: string;
+  detectedCountry?: string;
+  detectedRegion?: string;
+  detectedCity?: string;
+  detectedArea?: string;
   detectedCategory?: string;
   detectedSubcategory?: string;
   canonicalName?: string;
@@ -125,16 +149,21 @@ export type CategoryKey =
   | 'groceries'
   | 'clothing'
   | 'footwear'
+  | 'fitness'
   | 'household'
   | 'kitchen'
   | 'personal_care'
   | 'electronics'
   | 'hardware'
-  | 'fitness'
   | 'furniture'
   | 'automotive'
   | 'baby'
   | 'services'
   | 'housing'
   | 'transport'
+  | 'office'
+  | 'gardening'
+  | 'pets'
+  | 'travel'
+  | 'music'
   | string;

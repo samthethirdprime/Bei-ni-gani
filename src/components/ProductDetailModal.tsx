@@ -22,6 +22,7 @@ import { Product, CommunityReport } from '../types';
 import { fetchReportsForProduct } from '../services/firebaseService';
 import { PriceHistoryChart } from './PriceHistoryChart';
 import { VendorComparisonList } from './VendorComparisonList';
+import { formatPrice } from '../services/currencyService';
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -113,11 +114,13 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     setTimeout(() => setCopiedToastVisible(false), 3500);
   };
 
+  const curr = product.currency || 'KES';
+
   const handleShareWhatsApp = () => {
     const link = getDeepLink();
-    const formattedPrice = `KSh ${product.typicalPrice.toLocaleString()}`;
-    const formattedRange = `KSh ${product.minPrice.toLocaleString()} - KSh ${product.maxPrice.toLocaleString()}`;
-    const text = `BEI GANI? 🇰🇪\n${product.name}${product.swahiliName ? ` (${product.swahiliName})` : ''}\n💰 Typical Price: ${formattedPrice} / ${product.unit}\n📊 Range: ${formattedRange}\n📍 Location: ${product.county || 'Kenya'}\n\nCheck live vendor prices & community reports:\n${link}`;
+    const formattedPrice = formatPrice(product.typicalPrice, curr);
+    const formattedRange = `${formatPrice(product.minPrice, curr)} - ${formatPrice(product.maxPrice, curr)}`;
+    const text = `BEI GANI? 🌍\n${product.name}${product.swahiliName ? ` (${product.swahiliName})` : ''}\n💰 Typical Price: ${formattedPrice} / ${product.unit}\n📊 Range: ${formattedRange}\n📍 Location: ${product.area ? `${product.area}, ` : ''}${product.town || product.county}${product.country && product.country !== 'Kenya' ? ` (${product.country})` : ''}\n\nCheck live vendor prices & community reports:\n${link}`;
     const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
     window.open(waUrl, '_blank', 'noopener,noreferrer');
   };
@@ -136,23 +139,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     }
   };
 
-  const formattedTypical = new Intl.NumberFormat('en-KE', {
-    style: 'currency',
-    currency: 'KES',
-    maximumFractionDigits: 0
-  }).format(product.typicalPrice).replace('KES', 'KSh');
-
-  const formattedMin = new Intl.NumberFormat('en-KE', {
-    style: 'currency',
-    currency: 'KES',
-    maximumFractionDigits: 0
-  }).format(product.minPrice).replace('KES', 'KSh');
-
-  const formattedMax = new Intl.NumberFormat('en-KE', {
-    style: 'currency',
-    currency: 'KES',
-    maximumFractionDigits: 0
-  }).format(product.maxPrice).replace('KES', 'KSh');
+  const formattedTypical = formatPrice(product.typicalPrice, curr);
+  const formattedMin = formatPrice(product.minPrice, curr);
+  const formattedMax = formatPrice(product.maxPrice, curr);
 
   // Calculate percentage range position
   const rangeSpan = Math.max(product.maxPrice - product.minPrice, 1);
@@ -294,8 +283,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <div>
                 <span className="font-bold text-neutral-300 block">Locations Sampled</span>
                 <span className="text-neutral-400">
-                  {product.county}{product.town ? `, ${product.town}` : ''}
-                  {product.area ? ` (${product.area})` : ''}
+                  {product.area ? `${product.area}, ` : ''}
+                  {product.town || product.county}
+                  {product.country && product.country !== 'Kenya' ? `, ${product.country}` : ''}
                 </span>
               </div>
             </div>

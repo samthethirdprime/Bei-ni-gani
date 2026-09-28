@@ -13,6 +13,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { Product } from '../types';
+import { formatPrice } from '../services/currencyService';
 
 interface ProductCardProps {
   product: Product;
@@ -46,23 +47,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     }
   };
 
-  const formattedTypical = new Intl.NumberFormat('en-KE', {
-    style: 'currency',
-    currency: 'KES',
-    maximumFractionDigits: 0
-  }).format(product.typicalPrice).replace('KES', 'KSh');
-
-  const formattedMin = new Intl.NumberFormat('en-KE', {
-    style: 'currency',
-    currency: 'KES',
-    maximumFractionDigits: 0
-  }).format(product.minPrice).replace('KES', 'KSh');
-
-  const formattedMax = new Intl.NumberFormat('en-KE', {
-    style: 'currency',
-    currency: 'KES',
-    maximumFractionDigits: 0
-  }).format(product.maxPrice).replace('KES', 'KSh');
+  const curr = product.currency || 'KES';
+  const formattedTypical = formatPrice(product.typicalPrice, curr);
+  const formattedMin = formatPrice(product.minPrice, curr);
+  const formattedMax = formatPrice(product.maxPrice, curr);
 
   // Generic fallback image
   const fallbackImageUrl = 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80';
@@ -178,8 +166,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <div className="flex items-center gap-1 truncate max-w-[200px] sm:max-w-none">
             <MapPin className="w-3.5 h-3.5 text-neutral-500 flex-shrink-0" />
             <span className="truncate">
+              {product.area ? `${product.area}, ` : ''}
               {product.town || product.county}
-              {product.area ? ` • ${product.area}` : ''}
+              {product.country && product.country !== 'Kenya' ? ` (${product.country})` : ''}
             </span>
           </div>
 
