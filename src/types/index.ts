@@ -82,7 +82,7 @@ export interface Product {
   model?: string;
   sizeOrQuantity: string;
   unit: string;
-  image: string;
+  image?: string;
   typicalPrice: number;
   minPrice: number;
   maxPrice: number;

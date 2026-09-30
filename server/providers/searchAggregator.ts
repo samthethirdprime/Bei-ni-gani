@@ -62,8 +62,9 @@ export class SearchAggregator {
     // Execute all providers with individual timeout protection
     const promises = this.providers.map(async (provider) => {
       const perProviderTimeoutMs = 6500;
+      let timer: any;
       const timeoutPromise = new Promise<ProviderSearchResult>((resolve) => {
-        setTimeout(() => {
+        timer = setTimeout(() => {
           resolve({
             providerId: provider.id,
             providerName: provider.name,
@@ -78,11 +79,17 @@ export class SearchAggregator {
             }
           });
         }, perProviderTimeoutMs);
+        if (timer && timer.unref) {
+          timer.unref();
+        }
       });
 
       try {
-        return await Promise.race([provider.search(cleanQ, options), timeoutPromise]);
+        const res = await Promise.race([provider.search(cleanQ, options), timeoutPromise]);
+        if (timer) clearTimeout(timer);
+        return res;
       } catch (err: any) {
+        if (timer) clearTimeout(timer);
         const failedResult: ProviderSearchResult = {
           providerId: provider.id,
           providerName: provider.name,

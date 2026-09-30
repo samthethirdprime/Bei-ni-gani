@@ -89,12 +89,12 @@ export default function App() {
     const unsubscribe = subscribeToProducts((loadedProducts) => {
       if (loadedProducts && loadedProducts.length > 0) {
         setProducts((prev) => {
-          // Preserve any live-discovered products currently in memory so Firestore snapshot updates don't clear them
-          const liveDiscovered = prev.filter(p => p.isRealtimeDiscovered);
-          if (liveDiscovered.length === 0) return loadedProducts;
-          const loadedIds = new Set(loadedProducts.map(p => p.id));
-          const nonPersistedLive = liveDiscovered.filter(p => !loadedIds.has(p.id));
-          return [...nonPersistedLive, ...loadedProducts];
+          // Merge loaded Firestore products over catalog/prev products without wiping the initial catalog
+          const loadedMap = new Map(loadedProducts.map(p => [p.id, p]));
+          const updatedPrev = prev.map(p => loadedMap.get(p.id) || p);
+          const prevIds = new Set(prev.map(p => p.id));
+          const brandNew = loadedProducts.filter(p => !prevIds.has(p.id));
+          return [...brandNew, ...updatedPrev];
         });
       }
     });
@@ -320,31 +320,37 @@ export default function App() {
         return;
       }
 
-      if (result.verified && result.product) {
-        const discovered = result.product;
-        // Persist to Firestore
-        await saveDiscoveredProduct(discovered);
+      const hasProducts = result.verified && ((result.products && result.products.length > 0) || result.product);
+      if (hasProducts) {
+        const discoveredList: Product[] = result.products && result.products.length > 0
+          ? result.products
+          : (result.product ? [result.product] : []);
+
+        // Persist to Firestore in parallel
+        await Promise.allSettled(discoveredList.map(p => saveDiscoveredProduct(p)));
 
         // Guard again after async save in case request was superseded
         if (currentRequestId !== searchRequestIdRef.current) {
           return;
         }
 
-        // Search results are only updated if the new response contains at least one product
+        // Search results are updated with all new products
         setProducts((prev) => {
-          const filtered = prev.filter(p => p.id !== discovered.id && p.name.toLowerCase() !== discovered.name.toLowerCase());
-          return [discovered, ...filtered];
+          const newIds = new Set(discoveredList.map(p => p.id));
+          const newNames = new Set(discoveredList.map(p => p.name.toLowerCase()));
+          const filtered = prev.filter(p => !newIds.has(p.id) && !newNames.has(p.name.toLowerCase()));
+          return [...discoveredList, ...filtered];
         });
 
         setIsLiveSearching(false);
         setLiveSearchFailed(false);
-        showToast(`✓ Verified live prices found across ${discovered.vendors?.length || 3} Kenyan vendors!`);
+        showToast(`✓ Verified live prices found across ${discoveredList.length} product match${discoveredList.length === 1 ? '' : 'es'}!`);
       } else {
         // Late-arriving or empty response:
         // Prevent an empty response from clearing valid results rendered by a previous, successful request
         setIsLiveSearching(false);
         setProducts((prev) => {
-          // Check if previous successful requests already populated matching products for this query
+          // Check if previous successful requests or catalog already populated matching products for this query
           const hasExistingMatches = prev.some(p => {
             const nameLower = p.name.toLowerCase();
             const qTokens = trimmed.toLowerCase().split(/\s+/).filter(t => t.length > 1);
@@ -352,7 +358,7 @@ export default function App() {
           });
           if (!hasExistingMatches) {
             setLiveSearchFailed(true);
-            setLiveSearchFailedMessage(result.message || "We couldn't find a verified current price for this item.");
+            setLiveSearchFailedMessage(result.message || "No verified current price found.");
           } else {
             setLiveSearchFailed(false);
           }
@@ -366,7 +372,7 @@ export default function App() {
       console.error('Error during real-time search:', err);
       setIsLiveSearching(false);
       setLiveSearchFailed(true);
-      setLiveSearchFailedMessage("We couldn't find a verified current price for this item.");
+      setLiveSearchFailedMessage("No verified current price found.");
     }
   }, [selectedLocation, selectedCategory, queryAnalysis.detectedLocation]);
 

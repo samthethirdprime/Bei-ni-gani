@@ -56,7 +56,6 @@ export class OfficialKenyaConnector implements SourceConnector {
         sourceMethod: this.accessMethod,
         availability: 'IN_STOCK',
         dateCollected: 'Current EPRA Pricing Cycle',
-        imageUrl: 'https://images.unsplash.com/photo-1584281722573-b3c79c8846c4?auto=format&fit=crop&w=600&q=80',
         isVerified: true,
         notes: 'Statutory retail price guideline. Dealers selling above 1,450 KSh should be scrutinized.'
       });
@@ -80,7 +79,6 @@ export class OfficialKenyaConnector implements SourceConnector {
         sourceMethod: this.accessMethod,
         availability: 'IN_STOCK',
         dateCollected: 'Current EPRA Pricing Cycle',
-        imageUrl: 'https://images.unsplash.com/photo-1584281722573-b3c79c8846c4?auto=format&fit=crop&w=600&q=80',
         isVerified: true
       });
     }
@@ -107,7 +105,6 @@ export class OfficialKenyaConnector implements SourceConnector {
         sourceMethod: this.accessMethod,
         availability: 'IN_STOCK',
         dateCollected: 'Official 2026 Tariff',
-        imageUrl: 'https://images.unsplash.com/photo-1474487548417-781cb71495f3?auto=format&fit=crop&w=600&q=80',
         isVerified: true,
         notes: 'Fixed official tariff. Beware of scalpers charging above 1,500 KSh.'
       });

@@ -4,6 +4,7 @@
 import { ExternalListing, GroupedProductComparison } from './connectors/types';
 import { SearchQueryAnalysis } from '../types';
 import { matchesStrictLocation } from './locationService';
+import { isTrustworthyImageUrl } from './imageUtils';
 
 // Extract storage variant (e.g. "256GB", "128GB", "64GB", "512GB")
 export function extractStorageVariant(text: string): string | undefined {
@@ -181,7 +182,7 @@ export function groupListingsIntoProducts(
       variant: rep.variant || extractStorageVariant(rep.productName) || extractSizeVariant(rep.productName),
       category: rep.category,
       subcategory: rep.subcategory,
-      image: rep.imageUrl || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80',
+      image: items.find(i => isTrustworthyImageUrl(i.imageUrl))?.imageUrl || undefined,
       lowestPrice,
       highestPrice,
       typicalPrice,

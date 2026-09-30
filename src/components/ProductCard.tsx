@@ -10,10 +10,12 @@ import {
   AlertTriangle,
   ArrowRight,
   Store,
-  Sparkles
+  Sparkles,
+  Package
 } from 'lucide-react';
 import { Product } from '../types';
 import { formatPrice } from '../services/currencyService';
+import { isTrustworthyImageUrl } from '../services/imageUtils';
 
 interface ProductCardProps {
   product: Product;
@@ -52,8 +54,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const formattedMin = formatPrice(product.minPrice, curr);
   const formattedMax = formatPrice(product.maxPrice, curr);
 
-  // Generic fallback image
-  const fallbackImageUrl = 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80';
+  const hasValidImage = Boolean(product.image && isTrustworthyImageUrl(product.image) && !imgError);
 
   return (
     <div 
@@ -63,15 +64,24 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       <div>
         {/* Top Header: Image + Names + Price */}
         <div className="flex gap-3.5 items-start">
-          {/* Image */}
-          <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-neutral-950 flex-shrink-0 border border-neutral-800">
-            <img
-              src={imgError || !product.image ? fallbackImageUrl : product.image}
-              alt={product.name}
-              onError={() => setImgError(true)}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-              loading="lazy"
-            />
+          {/* Image / Neutral Placeholder */}
+          <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-neutral-950 flex-shrink-0 border border-neutral-800 flex items-center justify-center">
+            {hasValidImage ? (
+              <img
+                src={product.image}
+                alt={product.name}
+                onError={() => setImgError(true)}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                loading="lazy"
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-neutral-900 to-neutral-950 text-neutral-500 p-2 text-center select-none">
+                <Package className="w-8 h-8 text-neutral-600 mb-1 group-hover:scale-110 transition-transform" />
+                <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 line-clamp-1">
+                  {product.category || 'Product'}
+                </span>
+              </div>
+            )}
             {product.isCommunityAdded && (
               <span className="absolute top-1.5 left-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/90 text-neutral-950">
                 Community

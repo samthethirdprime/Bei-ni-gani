@@ -62,6 +62,17 @@ export interface SearchProvider {
   search(query: string, options?: SearchOptions): Promise<ProviderSearchResult>;
 }
 
+export function isTrustworthyImageUrl(url?: string | null): boolean {
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (!trimmed.startsWith('https://') && !trimmed.startsWith('http://')) return false;
+  if (trimmed.includes('unsplash.com')) return false;
+  if (trimmed.includes('[') || trimmed.includes(']') || trimmed.includes('<') || trimmed.includes('>')) return false;
+  if (trimmed.includes('(') && trimmed.includes(')') && trimmed.includes('http')) return false;
+  if (trimmed.length > 500) return false;
+  return true;
+}
+
 export function formatSearchResponse(
   result: {
     query: string;
@@ -84,66 +95,91 @@ export function formatSearchResponse(
     sourceUrl: i.sourceUrl || i.url,
     retrievedAt: i.retrievedAt || i.timestamp,
     acquisitionMethod: i.acquisitionMethod || (i.sourceType === 'official' ? 'official' : (i.sourceType === 'community' ? 'community' : 'search_snippet')),
-    sourceType: i.sourceType
+    sourceType: i.sourceType,
+    image: isTrustworthyImageUrl(i.image) ? i.image : undefined
   }));
 
-  if (result.hasLiveResults && result.items.length > 0) {
-    const primaryItem = result.items[0];
+  if (result.hasLiveResults && normalizedItems.length > 0) {
+    // Cluster items into distinct products by normalized product name / variant
+    const clusters = new Map<string, NormalizedPriceResult[]>();
 
-    const product = {
-      id: `discovered-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-      name: primaryItem.name || query,
-      aliases: [],
-      category: primaryItem.category || category || 'general',
-      sizeOrQuantity: '1 unit',
-      unit: primaryItem.unit || 'unit',
-      image: primaryItem.image || 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=600&q=80',
-      typicalPrice: result.typicalPrice,
-      minPrice: result.lowestPrice,
-      maxPrice: result.highestPrice,
-      priceType: primaryItem.sourceType === 'official' 
-        ? 'VERIFIED_OFFICIAL' 
-        : (primaryItem.sourceType === 'community' ? 'COMMUNITY_REPORT' : 'MARKET_RETAIL'),
-      county: primaryItem.county || targetLocation,
-      town: primaryItem.location || targetLocation,
-      retailerOrSource: result.items.map(i => i.vendor).slice(0, 3).join(', '),
-      dateCollected: 'Live Discovery',
-      reportsCount: result.items.length,
-      confirmsCount: 1,
-      outdatesCount: 0,
-      flaggedCount: 0,
-      sourceUrl: primaryItem.url,
-      description: `Verified prices retrieved across ${result.sources.length} Kenyan sources (${result.sources.join(', ')}). Lowest: KSh ${result.lowestPrice.toLocaleString()} | Highest: KSh ${result.highestPrice.toLocaleString()}.`,
-      isRealtimeDiscovered: true,
-      verified: true,
-      isDemo: false,
-      vendors: result.items.map((it, idx) => ({
-        id: `v-${idx}-${Date.now()}`,
-        vendorName: it.vendor,
-        price: it.price,
-        unit: it.unit || 'unit',
-        location: it.location || targetLocation,
-        sourceType: it.sourceType === 'community' 
-          ? 'COMMUNITY' 
-          : (it.sourceType === 'official' ? 'OFFICIAL' : 'ONLINE_RETAILER'),
-        acquisitionMethod: it.acquisitionMethod || (it.sourceType === 'official' ? 'official' : (it.sourceType === 'community' ? 'community' : 'search_snippet')),
-        sourceUrl: it.sourceUrl || it.url,
-        dateCollected: it.retrievedAt || it.timestamp,
-        inStock: true,
-        notes: it.notes,
-        isDemo: false
-      })),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
+    for (const item of normalizedItems) {
+      // Normalize product name to cluster key
+      const cleanName = item.name.toLowerCase().replace(/[^a-z0-9]/g, ' ').trim();
+      const tokens = cleanName.split(/\s+/).filter(t => t.length > 2).slice(0, 4);
+      const clusterKey = tokens.length > 0 ? tokens.join('-') : 'discovered-item';
+
+      if (!clusters.has(clusterKey)) {
+        clusters.set(clusterKey, []);
+      }
+      clusters.get(clusterKey)!.push(item);
+    }
+
+    const products = Array.from(clusters.entries()).map(([clusterKey, items], pIdx) => {
+      items.sort((a, b) => a.price - b.price);
+      const rep = items[0];
+      const prices = items.map(i => i.price).filter(p => p > 0);
+      const minPrice = prices.length > 0 ? Math.min(...prices) : rep.price;
+      const maxPrice = prices.length > 0 ? Math.max(...prices) : rep.price;
+      const typicalPrice = prices.length > 0 ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : rep.price;
+      const validImageItem = items.find(i => isTrustworthyImageUrl(i.image));
+
+      return {
+        id: `discovered-${clusterKey}-${pIdx}-${Date.now()}`,
+        name: rep.name || query,
+        aliases: [],
+        category: rep.category || category || 'general',
+        sizeOrQuantity: rep.unit || '1 unit',
+        unit: rep.unit || 'unit',
+        image: validImageItem?.image || undefined,
+        typicalPrice,
+        minPrice,
+        maxPrice,
+        priceType: rep.sourceType === 'official'
+          ? 'VERIFIED_OFFICIAL'
+          : (rep.sourceType === 'community' ? 'COMMUNITY_REPORT' : 'MARKET_RETAIL'),
+        county: rep.county || targetLocation,
+        town: rep.location || targetLocation,
+        retailerOrSource: Array.from(new Set(items.map(i => i.vendor))).slice(0, 3).join(', '),
+        dateCollected: 'Live Discovery',
+        reportsCount: items.length,
+        confirmsCount: 1,
+        outdatesCount: 0,
+        flaggedCount: 0,
+        sourceUrl: rep.url || rep.sourceUrl,
+        description: `Verified prices retrieved across ${Array.from(new Set(items.map(i => i.vendor))).length} Kenyan sources. Lowest: KSh ${minPrice.toLocaleString()} | Highest: KSh ${maxPrice.toLocaleString()}.`,
+        isRealtimeDiscovered: true,
+        verified: true,
+        isDemo: false,
+        vendors: items.map((it, idx) => ({
+          id: `v-${idx}-${Date.now()}`,
+          vendorName: it.vendor,
+          price: it.price,
+          unit: it.unit || 'unit',
+          location: it.location || targetLocation,
+          sourceType: it.sourceType === 'community'
+            ? 'COMMUNITY'
+            : (it.sourceType === 'official' ? 'OFFICIAL' : 'ONLINE_RETAILER'),
+          acquisitionMethod: it.acquisitionMethod || (it.sourceType === 'official' ? 'official' : (it.sourceType === 'community' ? 'community' : 'search_snippet')),
+          sourceUrl: it.sourceUrl || it.url,
+          dateCollected: it.retrievedAt || it.timestamp,
+          inStock: true,
+          notes: it.notes,
+          isDemo: false
+        })),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+    });
 
     return {
       verified: true,
       hasLiveResults: true,
-      product,
+      product: products[0] || null,
+      products: products,
       items: normalizedItems,
       results: normalizedItems,
-      totalCount: result.totalCount,
+      totalCount: normalizedItems.length,
       lowestPrice: result.lowestPrice,
       highestPrice: result.highestPrice,
       typicalPrice: result.typicalPrice,
@@ -155,6 +191,7 @@ export function formatSearchResponse(
       verified: false,
       hasLiveResults: false,
       product: null,
+      products: [],
       items: [],
       results: [],
       totalCount: 0,
@@ -163,7 +200,7 @@ export function formatSearchResponse(
       typicalPrice: 0,
       sources: result.sources || [],
       providersStatus: result.providersStatus || [],
-      message: 'No live results available from the connected sources.'
+      message: 'No verified current price found.'
     };
   }
 }

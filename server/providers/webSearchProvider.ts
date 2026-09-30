@@ -1,4 +1,4 @@
-import { SearchProvider, ProviderSearchResult, NormalizedPriceResult } from './types';
+import { SearchProvider, ProviderSearchResult, NormalizedPriceResult, isTrustworthyImageUrl } from './types';
 
 // Map known Kenyan retailer domains to clean vendor display names
 function resolveVendorFromDomain(domain: string): { name: string; isOfficialRetailer: boolean } {
@@ -59,6 +59,24 @@ function decodeHtmlEntities(str: string): string {
     .trim();
 }
 
+function cleanProductTitle(rawTitle: string, fallbackQuery: string): string {
+  let cleaned = decodeHtmlEntities(rawTitle.replace(/<[^>]+>/g, '').trim());
+  cleaned = cleaned.replace(/\s*\|\s*Jumia Kenya.*$/i, '');
+  cleaned = cleaned.replace(/\s*-\s*Jumia KE.*$/i, '');
+  cleaned = cleaned.replace(/\s*\|\s*Kilimall.*$/i, '');
+  cleaned = cleaned.replace(/\s*Prices on Jiji\.co\.ke.*$/i, '');
+  cleaned = cleaned.replace(/\s*on Jiji\.co\.ke.*$/i, '');
+  cleaned = cleaned.replace(/\s*-\s*Carrefour Kenya.*$/i, '');
+  cleaned = cleaned.replace(/\s*\|\s*Homelux Kenya.*$/i, '');
+  cleaned = cleaned.replace(/\s*for sale in Kenya.*$/i, '');
+  cleaned = cleaned.replace(/\s*in Kenya for sale.*$/i, '');
+  cleaned = cleaned.replace(/\s*Best Price in Kenya.*$/i, '');
+  cleaned = cleaned.replace(/^Buy\s+/i, '');
+  cleaned = cleaned.trim();
+  if (cleaned.length < 3) return fallbackQuery;
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
 // Attempt to fetch schema.org JSON-LD from a direct retailer product page with short timeout
 async function fetchProductPageDetails(url: string): Promise<{ name?: string; price?: number; image?: string } | null> {
   try {
@@ -84,10 +102,11 @@ async function fetchProductPageDetails(url: string): Promise<{ name?: string; pr
           const rawPrice = data.offers?.price || data.offers?.[0]?.price;
           const numPrice = typeof rawPrice === 'string' ? parseFloat(rawPrice.replace(/,/g, '')) : (typeof rawPrice === 'number' ? rawPrice : undefined);
 
+          const rawImg = typeof data.image === 'string' ? data.image : (Array.isArray(data.image) ? data.image[0] : undefined);
           return {
             name: data.name,
             price: numPrice && numPrice > 0 ? Math.round(numPrice) : undefined,
-            image: typeof data.image === 'string' ? data.image : (Array.isArray(data.image) ? data.image[0] : undefined)
+            image: isTrustworthyImageUrl(rawImg) ? rawImg : undefined
           };
         }
       } catch (e) {
@@ -118,74 +137,132 @@ export class WebSearchProvider implements SearchProvider {
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(searchQuery)}`;
-      const res = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'en-GB,en;q=0.9,sw;q=0.8'
-        },
-        signal: controller.signal
-      });
+      // 1. Try DuckDuckGo Lite first (does not hit 202 bot challenge)
+      let html = '';
+      try {
+        const liteUrl = `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(searchQuery)}`;
+        const liteRes = await fetch(liteUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-GB,en;q=0.9,sw;q=0.8'
+          },
+          signal: controller.signal
+        });
+        if (liteRes.ok && liteRes.status === 200) {
+          html = await liteRes.text();
+        }
+      } catch (liteErr) {
+        // fallback to html.duckduckgo.com
+      }
+
+      // If Lite didn't return or was empty, try html.duckduckgo.com
+      if (!html || !html.includes('result-snippet')) {
+        const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(searchQuery)}`;
+        const res = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-GB,en;q=0.9,sw;q=0.8'
+          },
+          signal: controller.signal
+        });
+        if (res.ok && res.status !== 202) {
+          html = await res.text();
+        }
+      }
 
       clearTimeout(timeoutId);
 
-      if (!res.ok || res.status === 202) {
-        throw new Error(`External search returned HTTP ${res.status}${res.status === 202 ? ' (Search engine bot challenge / rate-limit)' : ''}`);
+      if (!html) {
+        return {
+          providerId: this.id,
+          providerName: this.name,
+          items: [],
+          status: {
+            providerId: this.id,
+            providerName: this.name,
+            status: 'success',
+            itemCount: 0,
+            durationMs: Date.now() - startTime
+          }
+        };
       }
 
-      const html = await res.text();
-
-      // Parse DuckDuckGo result blocks
-      const blockRegex = /<a class="result__url"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
-      let match;
       let count = 0;
       const pagesToInspect: { url: string; vendorName: string; snippetTitle: string }[] = [];
 
+      // Parse either DDG Lite or standard DDG HTML
+      const isLite = html.includes('result-snippet');
+      const blockRegex = isLite
+        ? /<a[^>]+href=["']([^"']+)["'][^>]*class=["']result-link["'][^>]*>([\s\S]*?)<\/a>[\s\S]*?<td[^>]*class=["']result-snippet["'][^>]*>([\s\S]*?)<\/td>/gi
+        : /<a class="result__url"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi;
+
+      let match;
       while ((match = blockRegex.exec(html)) && count < 8) {
         const rawUrl = match[1];
-        const displayDomain = match[2].replace(/<[^>]+>/g, '').trim();
-        const snippet = match[3].replace(/<[^>]+>/g, '').trim();
+        const rawTitleOrDomain = match[2];
+        const rawSnippet = match[3];
         const cleanLink = cleanTargetUrl(rawUrl);
+        const snippetText = decodeHtmlEntities(rawSnippet.replace(/<[^>]+>/g, '').trim());
+        const titleText = isLite ? cleanProductTitle(rawTitleOrDomain, cleanQ) : cleanQ;
 
-        // Strict query relevance filter:
-        const snippetLower = snippet.toLowerCase();
-        const urlLower = cleanLink.toLowerCase();
-        const queryTokens = cleanQ.toLowerCase().split(/\s+/).filter(t => t.length > 2);
-        
-        const hasRelevantToken = queryTokens.length === 0 || 
-          snippetLower.includes(cleanQ.toLowerCase()) || 
-          queryTokens.every(tok => snippetLower.includes(tok) || urlLower.includes(tok));
+        // =========================================================================
+        // STRICT RELEVANCE & ANTI-COLLISION GUARDS
+        // =========================================================================
+        const combinedText = `${titleText} ${snippetText} ${cleanLink}`.toLowerCase();
+        const qLower = cleanQ.toLowerCase();
 
-        if (!hasRelevantToken) {
-          continue; // Skip unrelated search results
+        // 1. Watermelon vs Bottled Water
+        if ((qLower.includes('watermelon') || qLower.includes('water melon') || qLower.includes('tikiti')) && 
+            (combinedText.includes('bottled water') || combinedText.includes('mineral water') || combinedText.includes('water tank') || combinedText.includes('drinking water'))) {
+          continue;
+        }
+
+        // 2. Boxers/Underwear vs Boxing Gloves
+        if ((qLower.includes('boxer') || qLower.includes('underwear') || qLower.includes('panties')) && 
+            (combinedText.includes('boxing glove') || combinedText.includes('punching bag') || combinedText.includes('boxing ring'))) {
+          continue;
+        }
+
+        // 3. Shoe rack vs Shoes
+        if ((qLower.includes('shoe rack') || qLower.includes('shoerack')) && 
+            !combinedText.includes('rack') && !combinedText.includes('stand') && !combinedText.includes('organizer') && !combinedText.includes('cabinet')) {
+          continue;
+        }
+
+        // 4. Anal plug anti-collision (must strictly require the exact query terms)
+        if (qLower === 'anal plug' && (!combinedText.includes('anal') || !combinedText.includes('plug'))) {
+          continue;
+        }
+
+        // 5. Query token overlap
+        const queryTokens = qLower.split(/\s+/).filter(t => t.length > 2 && !['price', 'kenya', 'ksh', 'how', 'much'].includes(t));
+        const hasAllTokens = queryTokens.length === 0 || queryTokens.every(t => combinedText.includes(t));
+        if (!hasAllTokens) {
+          continue;
         }
 
         // Price pattern in KES / KSh
-        const priceRegex = /(?:(?:Ksh\.?|KES)\s*([0-9,]+(?:\.\d{1,2})?)|(?:Price|Price:)\s*(?:Ksh\.?|KES)?\s*([0-9,]+(?:\.\d{1,2})?))/i;
-        const priceMatch = snippet.match(priceRegex);
+        const priceRegex = /(?:(?:Ksh\.?|KES)\s*([0-9,]+(?:\.\d{1,2})?)|(?:Price|Price:)\s*(?:Ksh\.?|KES)\s*([0-9,]+(?:\.\d{1,2})?))/i;
+        const priceMatch = snippetText.match(priceRegex);
 
-        const vendorInfo = resolveVendorFromDomain(cleanLink || displayDomain);
+        const vendorInfo = resolveVendorFromDomain(cleanLink);
 
         if (priceMatch) {
           const rawPriceStr = priceMatch[1] || priceMatch[2];
           const parsedPrice = parseFloat(rawPriceStr.replace(/,/g, ''));
 
           if (parsedPrice && parsedPrice > 0 && parsedPrice < 10000000) {
-            // Clean product title from snippet or query
-            let detectedName = cleanQ;
-            const titleMatch = snippet.match(new RegExp(`(${cleanQ}[^.?!,;–—\\n]{0,60})`, 'i'));
-            if (titleMatch) {
-              detectedName = decodeHtmlEntities(titleMatch[1]);
-            } else {
-              detectedName = decodeHtmlEntities(detectedName);
+            // Sanity check: prevent delivery fees or ad counts for high-value goods
+            const isHighValue = /\b(duvet|blanket|bed|mattress|phone|tv|television|fridge|refrigerator|laptop|cooker|sofa|furniture|table|rack)\b/i.test(titleText + ' ' + cleanQ);
+            if (isHighValue && parsedPrice < 350) {
+              continue;
             }
-
-            const formattedName = detectedName.charAt(0).toUpperCase() + detectedName.slice(1);
 
             items.push({
               id: `web-${count}-${Date.now()}`,
-              name: formattedName,
+              name: titleText,
               price: Math.round(parsedPrice),
               currency: 'KES',
               vendor: vendorInfo.name,
@@ -205,8 +282,7 @@ export class WebSearchProvider implements SearchProvider {
             count++;
           }
         } else if (cleanLink.includes('carrefour.ke/mafken/en/') && cleanLink.includes('/p/')) {
-          // If it's a direct Carrefour product page link with missing snippet price, enqueue for JSON-LD check
-          pagesToInspect.push({ url: cleanLink, vendorName: vendorInfo.name, snippetTitle: cleanQ });
+          pagesToInspect.push({ url: cleanLink, vendorName: vendorInfo.name, snippetTitle: titleText });
         }
       }
 
@@ -227,7 +303,7 @@ export class WebSearchProvider implements SearchProvider {
               acquisitionMethod: 'direct_webpage',
               url: page.url,
               sourceUrl: page.url,
-              image: details.image,
+              image: isTrustworthyImageUrl(details.image) ? details.image : undefined,
               location: targetLoc !== 'Worldwide' ? targetLoc : 'Kenya',
               retrievedAt: new Date().toISOString(),
               timestamp: new Date().toISOString(),

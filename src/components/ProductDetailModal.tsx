@@ -16,13 +16,15 @@ import {
   Share2,
   Copy,
   MessageCircle,
-  FileText
+  FileText,
+  Package
 } from 'lucide-react';
 import { Product, CommunityReport } from '../types';
 import { fetchReportsForProduct } from '../services/firebaseService';
 import { PriceHistoryChart } from './PriceHistoryChart';
 import { VendorComparisonList } from './VendorComparisonList';
 import { formatPrice } from '../services/currencyService';
+import { isTrustworthyImageUrl } from '../services/imageUtils';
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -54,8 +56,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [isRefreshingVendors, setIsRefreshingVendors] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copiedToastVisible, setCopiedToastVisible] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
+    setImgError(false);
     if (product) {
       setLoadingReports(true);
       fetchReportsForProduct(product.id)
@@ -201,12 +205,22 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         <div className="overflow-y-auto p-5 space-y-6">
           {/* Main Visual & Info Header */}
           <div className="flex flex-col sm:flex-row gap-4 items-start">
-            <div className="w-full sm:w-44 h-48 sm:h-44 rounded-2xl overflow-hidden bg-neutral-950 border border-neutral-800 flex-shrink-0">
-              <img
-                src={product.image}
-                alt={product.name}
-                className="w-full h-full object-cover"
-              />
+            <div className="w-full sm:w-44 h-48 sm:h-44 rounded-2xl overflow-hidden bg-neutral-950 border border-neutral-800 flex-shrink-0 flex items-center justify-center">
+              {product.image && isTrustworthyImageUrl(product.image) && !imgError ? (
+                <img
+                  src={product.image}
+                  alt={product.name}
+                  onError={() => setImgError(true)}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-neutral-900 to-neutral-950 text-neutral-500 p-4 text-center select-none">
+                  <Package className="w-12 h-12 text-neutral-600 mb-2" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                    {product.category || 'Product'}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="flex-1">

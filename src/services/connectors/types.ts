@@ -89,7 +89,7 @@ export interface GroupedProductComparison {
   variant?: string;
   category: string;
   subcategory?: string;
-  image: string;
+  image?: string;
   lowestPrice: number;
   highestPrice: number;
   typicalPrice: number;

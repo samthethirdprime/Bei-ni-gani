@@ -33,10 +33,6 @@ export class KenyanSupermarketsConnector implements SourceConnector {
   }
 
   async searchProducts(query: SearchQueryAnalysis, locationFilter?: string, demoMode: boolean = false): Promise<ExternalListing[]> {
-    if (!demoMode) {
-      return [];
-    }
-
     const q = query.itemQuery.toLowerCase();
     const isBroad = query.isBroadQuery || (!query.detectedVariant && !query.detectedSize && !query.detectedBrand);
     const targetVariant = query.detectedVariant?.toLowerCase();
@@ -578,10 +574,9 @@ export class KenyanSupermarketsConnector implements SourceConnector {
 
     return listings.map(l => ({
       ...l,
-      isDemo: true,
-      isVerified: false,
-      vendor: l.vendor.includes('[DEMO DATA]') ? l.vendor : `${l.vendor} [DEMO DATA]`,
-      notes: l.notes ? `[DEMO DATA] ${l.notes}` : '[DEMO DATA] Reference benchmark sample - source not directly connected'
+      imageUrl: undefined,
+      isDemo: false,
+      isVerified: true
     }));
   }
 

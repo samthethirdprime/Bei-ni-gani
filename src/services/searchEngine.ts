@@ -1093,7 +1093,7 @@ export async function searchRealtimePrice(
   county?: string,
   category?: string,
   demoMode: boolean = false
-): Promise<{ product: Product | null; verified: boolean; message?: string; sources?: string[] }> {
+): Promise<{ product: Product | null; products?: Product[]; verified: boolean; message?: string; sources?: string[] }> {
   const analysis = analyzeSearchQuery(rawQuery);
   const targetLocation = county || analysis.detectedLocation;
 
@@ -1112,7 +1112,7 @@ export async function searchRealtimePrice(
 
     if (res.ok) {
       const data = await res.json();
-      if (data.verified && data.product) {
+      if (data.verified && (data.product || (data.products && data.products.length > 0))) {
         return data;
       }
     }
@@ -1123,11 +1123,12 @@ export async function searchRealtimePrice(
   // 2. Search connected Kenyan sources (Firestore Community Reports, EPRA official caps, and demo connectors if demoMode=true)
   try {
     const connectorResult = await connectorRegistry.searchAll(analysis, targetLocation, category, demoMode);
-    if (connectorResult.groupedResults.primaryGroup && connectorResult.groupedResults.primaryGroup.listings.length > 0) {
-      const unifiedProduct = convertGroupedToProduct(connectorResult.groupedResults.primaryGroup, targetLocation);
+    if (connectorResult.groupedResults.allGroups && connectorResult.groupedResults.allGroups.length > 0) {
+      const unifiedProducts = connectorResult.groupedResults.allGroups.map(g => convertGroupedToProduct(g, targetLocation));
       return {
-        verified: !unifiedProduct.isDemo,
-        product: unifiedProduct,
+        verified: unifiedProducts.some(p => !p.isDemo),
+        product: unifiedProducts[0] || null,
+        products: unifiedProducts,
         sources: connectorResult.queriedSources
       };
     }
@@ -1139,6 +1140,7 @@ export async function searchRealtimePrice(
   return {
     verified: false,
     product: null,
+    products: [],
     message: "No verified current price found."
   };
 }
