@@ -53,39 +53,55 @@ export const ConnectedSourcesModal: React.FC<ConnectedSourcesModalProps> = ({ is
           {/* Connected Sources List */}
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400 mb-3 flex items-center gap-1.5">
-              <Cpu className="w-3.5 h-3.5 text-emerald-400" /> Active Kenyan Source Connectors ({sources.length})
+              <Cpu className="w-3.5 h-3.5 text-emerald-400" /> Source Connectors Audit ({sources.length})
             </h3>
             
             <div className="space-y-3">
-              {sources.map(source => (
-                <div key={source.id} className="p-4 rounded-2xl border border-neutral-800 bg-neutral-950/60 hover:border-neutral-700 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-white text-sm">{source.name}</span>
-                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800/60">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Connected
-                      </span>
-                    </div>
-                    <div className="text-xs text-neutral-400 flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <span>Method: <strong className="text-neutral-200 font-medium">{source.status.accessMethod.replace(/_/g, ' ')}</strong></span>
-                      <span>Category: <strong className="text-neutral-200 font-medium">{source.status.sourceCategory}</strong></span>
-                    </div>
-                    {source.status.legalNotice && (
-                      <p className="text-[11px] text-neutral-500 italic mt-1">{source.status.legalNotice}</p>
-                    )}
-                  </div>
+              {sources.map(source => {
+                const isReal = source.status.isRealConnection;
+                const connectionType = source.status.connectionType;
 
-                  <a
-                    href={source.officialUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400 hover:text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-800/80 px-3 py-1.5 rounded-xl transition-colors self-start sm:self-center shrink-0"
-                  >
-                    <span>View portal</span>
-                    <ArrowUpRight className="w-3.5 h-3.5" />
-                  </a>
-                </div>
-              ))}
+                return (
+                  <div key={source.id} className="p-4 rounded-2xl border border-neutral-800 bg-neutral-950/60 hover:border-neutral-700 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-white text-sm">{source.name}</span>
+                        {isReal ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800/60">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Genuinely Connected
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800/60">
+                            Requires 1P Partner API
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-neutral-400 flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span>Access: <strong className="text-neutral-200 font-medium">{source.status.accessMethod.replace(/_/g, ' ')}</strong></span>
+                        <span>Category: <strong className="text-neutral-200 font-medium">{source.status.sourceCategory}</strong></span>
+                      </div>
+                      {source.status.requiredApiNotice && (
+                        <p className="text-[11px] text-amber-400/90 bg-amber-950/30 border border-amber-800/40 p-2 rounded-xl mt-1">
+                          <strong>Connection Requirement:</strong> {source.status.requiredApiNotice}
+                        </p>
+                      )}
+                      {source.status.legalNotice && (
+                        <p className="text-[11px] text-neutral-500 italic">{source.status.legalNotice}</p>
+                      )}
+                    </div>
+
+                    <a
+                      href={source.officialUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400 hover:text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-800/80 px-3 py-1.5 rounded-xl transition-colors self-start sm:self-center shrink-0"
+                    >
+                      <span>Official Portal</span>
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                );
+              })}
             </div>
           </div>
 

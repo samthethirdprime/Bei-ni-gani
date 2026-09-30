@@ -24,25 +24,35 @@ export class CommunityReportsConnector implements SourceConnector {
     return {
       online: true,
       isConfigured: true,
+      isRealConnection: true,
+      connectionType: 'DIRECT_DATABASE',
       accessMethod: this.accessMethod,
       sourceCategory: this.sourceCategory,
       lastSync: new Date().toISOString(),
-      legalNotice: 'Crowdsourced verified price submissions from real Kenyans buying in estates and local markets.'
+      legalNotice: 'Real-time crowdsourced verified price submissions from real Kenyans buying in estates, shops, and open-air markets stored in Firebase Firestore.'
     };
   }
 
-  async searchProducts(searchQuery: SearchQueryAnalysis, locationFilter?: string): Promise<ExternalListing[]> {
+  async searchProducts(searchQuery: SearchQueryAnalysis, locationFilter?: string, demoMode: boolean = false): Promise<ExternalListing[]> {
     const listings: ExternalListing[] = [];
     const targetLoc = locationFilter || searchQuery.detectedLocation;
+    const cleanQ = searchQuery.itemQuery.toLowerCase().trim();
 
+    // 1. Fetch real community reports from Firebase Firestore
     try {
-      const qSnap = await getDocs(firestoreQuery(collection(db, 'reports'), limit(40)));
+      const qSnap = await getDocs(firestoreQuery(collection(db, 'reports'), limit(100)));
       qSnap.forEach(docSnap => {
         const data = docSnap.data();
         if (data && data.productName && data.reportedPrice) {
+          const prodName = String(data.productName).toLowerCase();
+          // Match against search query tokens if query is present
+          if (cleanQ && !prodName.includes(cleanQ) && !cleanQ.includes(prodName)) {
+            return;
+          }
+
           const l: ExternalListing = {
             id: `comm-${docSnap.id}`,
-            productId: data.productId || 'custom',
+            productId: data.productId || `custom-${docSnap.id}`,
             productName: data.productName,
             category: data.category || 'general',
             price: Number(data.reportedPrice),
@@ -52,14 +62,15 @@ export class CommunityReportsConnector implements SourceConnector {
             county: data.county,
             town: data.town,
             area: data.area,
-            source: 'Community Report',
+            source: 'Bei Gani Community',
             sourceCategory: 'COMMUNITY',
             sourceMethod: this.accessMethod,
             availability: 'IN_STOCK',
             dateCollected: data.purchaseDate || 'Recent',
             imageUrl: data.receiptUrl || undefined,
             isVerified: true,
-            notes: data.notes || 'Verified by community user submission'
+            isDemo: false,
+            notes: data.notes || 'Verified by community user submission in Firebase'
           };
 
           // Apply strict location if specified
@@ -69,94 +80,65 @@ export class CommunityReportsConnector implements SourceConnector {
         }
       });
     } catch (e) {
-      // Graceful fallback to static community reports if Firestore is offline
+      console.warn('[CommunityConnector] Firestore query note:', e);
     }
 
-    // Default verified community reports for everyday Kenyan goods
-    const q = searchQuery.itemQuery.toLowerCase();
-    
-    if (q.includes('samsung') && q.includes('a56')) {
-      const rep: ExternalListing = {
-        id: 'comm-samsung-a56-report',
-        productId: 'samsung-a56-256',
-        productName: 'Samsung Galaxy A56 5G (256GB Dual SIM)',
-        brand: 'Samsung',
-        model: 'Galaxy A56',
-        variant: '256GB',
-        category: 'electronics',
-        subcategory: 'Smartphones',
-        price: 42500,
-        currency: 'KES',
-        vendor: 'Al-Haramain Phones (Eastleigh First Avenue)',
-        location: 'Eastleigh, First Avenue, Nairobi',
-        county: 'Nairobi',
-        town: 'Eastleigh',
-        area: 'First Avenue',
-        source: 'Community Report',
-        sourceCategory: 'COMMUNITY',
-        sourceMethod: this.accessMethod,
-        availability: 'IN_STOCK',
-        dateCollected: 'Yesterday',
-        isVerified: true,
-        notes: 'User reported paying 42,500 cash at Eastleigh mall. Genuine stock.'
-      };
-      if (!targetLoc || matchesStrictLocation(rep, targetLoc)) {
-        listings.push(rep);
+    // 2. Only if Demo Mode is explicitly enabled, return reference sample reports clearly labeled as DEMO DATA
+    if (demoMode) {
+      const q = cleanQ;
+      
+      if (q.includes('samsung') && q.includes('a56')) {
+        listings.push({
+          id: 'demo-comm-samsung-a56',
+          productId: 'samsung-a56-256',
+          productName: 'Samsung Galaxy A56 5G (256GB Dual SIM)',
+          brand: 'Samsung',
+          model: 'Galaxy A56',
+          variant: '256GB',
+          category: 'electronics',
+          subcategory: 'Smartphones',
+          price: 42500,
+          currency: 'KES',
+          vendor: 'Al-Haramain Phones (Eastleigh) [DEMO DATA]',
+          location: 'Eastleigh, First Avenue, Nairobi',
+          county: 'Nairobi',
+          town: 'Eastleigh',
+          area: 'First Avenue',
+          source: 'Community Report (Demo Benchmark)',
+          sourceCategory: 'COMMUNITY',
+          sourceMethod: this.accessMethod,
+          availability: 'IN_STOCK',
+          dateCollected: 'Reference Demo Sample',
+          isVerified: false,
+          isDemo: true,
+          notes: '[DEMO DATA] Reference benchmark sample - not live'
+        });
       }
-    }
 
-    if (q.includes('bedsitter') || q.includes('bedsitters')) {
-      const rongaiRep: ExternalListing = {
-        id: 'comm-bedsitter-rongai-report',
-        productId: 'bedsitter-rongai',
-        productName: 'Bedsitter Studio Apartment (Ongata Rongai Maasai Lodge)',
-        category: 'housing',
-        subcategory: 'Residential Rentals',
-        variant: '1 Month Rent',
-        price: 7000,
-        currency: 'KES',
-        vendor: 'Tumaini Courts Caretaker',
-        location: 'Ongata Rongai, Maasai Lodge Stage, Kajiado County',
-        county: 'Kajiado',
-        town: 'Ongata Rongai',
-        area: 'Maasai Lodge',
-        source: 'Community Report',
-        sourceCategory: 'COMMUNITY',
-        sourceMethod: this.accessMethod,
-        availability: 'IN_STOCK',
-        dateCollected: 'Today',
-        isVerified: true,
-        notes: 'Tenant verified: 7,000 monthly rent + 1,000 deposit, token water included.'
-      };
-      if (!targetLoc || matchesStrictLocation(rongaiRep, targetLoc)) {
-        listings.push(rongaiRep);
-      }
-    }
-
-    if (q.includes('humidifier')) {
-      const humRep: ExternalListing = {
-        id: 'comm-humidifier-report',
-        productId: 'air-humidifier-3l',
-        productName: 'Ultrasonic Cool Mist Air Humidifier (2.5L)',
-        category: 'household',
-        subcategory: 'Appliances & Air Quality',
-        price: 2300,
-        currency: 'KES',
-        vendor: 'Kamukunji Wholesale Household Importers',
-        location: 'Kamukunji, Nairobi CBD',
-        county: 'Nairobi',
-        town: 'Nairobi CBD',
-        area: 'Kamukunji',
-        source: 'Community Report',
-        sourceCategory: 'COMMUNITY',
-        sourceMethod: this.accessMethod,
-        availability: 'IN_STOCK',
-        dateCollected: '3 days ago',
-        isVerified: true,
-        notes: 'Bought at Kamukunji wholesale shops for 2,300 KSh cash.'
-      };
-      if (!targetLoc || matchesStrictLocation(humRep, targetLoc)) {
-        listings.push(humRep);
+      if (q.includes('gas') || q.includes('lpg') || q.includes('6kg')) {
+        listings.push({
+          id: 'demo-comm-gas-6kg',
+          productId: 'lpg-gas-6kg-refill',
+          productName: '6kg Cooking Gas Refill (Kware Estate Shop)',
+          variant: '6kg refill',
+          category: 'household',
+          subcategory: 'Cooking Gas & LPG',
+          price: 1250,
+          currency: 'KES',
+          vendor: 'Kware Mini Market [DEMO DATA]',
+          location: 'Ongata Rongai, Kware, Kajiado',
+          county: 'Kajiado',
+          town: 'Ongata Rongai',
+          area: 'Kware',
+          source: 'Community Report (Demo Benchmark)',
+          sourceCategory: 'COMMUNITY',
+          sourceMethod: this.accessMethod,
+          availability: 'IN_STOCK',
+          dateCollected: 'Reference Demo Sample',
+          isVerified: false,
+          isDemo: true,
+          notes: '[DEMO DATA] Reference benchmark sample - not live'
+        });
       }
     }
 

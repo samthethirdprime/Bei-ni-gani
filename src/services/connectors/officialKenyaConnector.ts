@@ -22,14 +22,16 @@ export class OfficialKenyaConnector implements SourceConnector {
     return {
       online: true,
       isConfigured: true,
+      isRealConnection: true,
+      connectionType: 'REGULATORY_GAZETTE',
       accessMethod: this.accessMethod,
       sourceCategory: this.sourceCategory,
       lastSync: new Date().toISOString(),
-      legalNotice: 'Official statutory maximum price caps gazetted under Kenyan law by EPRA & Kenya Railways.'
+      legalNotice: 'Official statutory maximum price caps and tariffs gazetted under Kenyan law by EPRA & Kenya Railways Corporation.'
     };
   }
 
-  async searchProducts(query: SearchQueryAnalysis, locationFilter?: string): Promise<ExternalListing[]> {
+  async searchProducts(query: SearchQueryAnalysis, locationFilter?: string, demoMode: boolean = false): Promise<ExternalListing[]> {
     const q = query.itemQuery.toLowerCase();
     const listings: ExternalListing[] = [];
 

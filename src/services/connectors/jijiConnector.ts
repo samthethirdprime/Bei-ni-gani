@@ -15,21 +15,28 @@ export class JijiKenyaConnector implements SourceConnector {
   readonly supportedCategories = ['electronics', 'housing', 'services', 'clothing', 'furniture', 'hardware', 'automotive'];
 
   isConfigured(): boolean {
-    return true;
+    return false;
   }
 
   getStatus(): SourceConnectorStatus {
     return {
       online: true,
-      isConfigured: true,
+      isConfigured: false,
+      isRealConnection: false,
+      connectionType: 'ENTERPRISE_API_REQUIRED',
       accessMethod: this.accessMethod,
       sourceCategory: this.sourceCategory,
       lastSync: new Date().toISOString(),
-      legalNotice: 'Public verified listing feeds from genuine Kenyan buyers & sellers on Jiji.co.ke.'
+      legalNotice: 'Jiji.co.ke classified listings index. Direct programmatic integration requires Jiji Partner API.',
+      requiredApiNotice: 'Direct 1P integration requires Jiji Kenya Partner API credentials. Live queries are performed via Bei Gani? Real-Time Search Grounding proxy.'
     };
   }
 
-  async searchProducts(query: SearchQueryAnalysis, locationFilter?: string): Promise<ExternalListing[]> {
+  async searchProducts(query: SearchQueryAnalysis, locationFilter?: string, demoMode: boolean = false): Promise<ExternalListing[]> {
+    if (!demoMode) {
+      return [];
+    }
+
     const q = query.itemQuery.toLowerCase();
     const targetLoc = locationFilter || query.detectedLocation;
     const allListings: ExternalListing[] = [];
@@ -303,12 +310,20 @@ export class JijiKenyaConnector implements SourceConnector {
       });
     }
 
+    const tagged = allListings.map(l => ({
+      ...l,
+      isDemo: true,
+      isVerified: false,
+      vendor: l.vendor.includes('[DEMO DATA]') ? l.vendor : `${l.vendor} [DEMO DATA]`,
+      notes: l.notes ? `[DEMO DATA] ${l.notes}` : '[DEMO DATA] Reference benchmark sample - source not directly connected'
+    }));
+
     // Apply strict location filtering
     if (targetLoc) {
-      return allListings.filter(l => matchesStrictLocation(l, targetLoc));
+      return tagged.filter(l => matchesStrictLocation(l, targetLoc));
     }
 
-    return allListings;
+    return tagged;
   }
 
   async getProductDetails(productId: string): Promise<ExternalListing | null> {

@@ -213,6 +213,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <h2 className="text-xl sm:text-2xl font-black text-white font-['Space_Grotesk'] leading-tight">
                 {product.name}
               </h2>
+              {product.isDemo && (
+                <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-950 text-amber-400 border border-amber-800/80 mt-1">
+                  DEMO DATA (Reference Benchmark)
+                </span>
+              )}
               {product.swahiliName && (
                 <p className="text-sm text-emerald-400 font-semibold mt-0.5">
                   {product.swahiliName}

@@ -46,16 +46,20 @@ export interface ExternalListing {
   specifications?: Record<string, string>;
   isVerified: boolean;
   notes?: string;
+  isDemo?: boolean;
 }
 
 export interface SourceConnectorStatus {
   online: boolean;
   isConfigured: boolean;
+  isRealConnection: boolean;
+  connectionType: 'DIRECT_DATABASE' | 'REGULATORY_GAZETTE' | 'REALTIME_SEARCH_GROUNDING' | 'ENTERPRISE_API_REQUIRED';
   accessMethod: SourceAccessMethod;
   sourceCategory: SourceCategory;
   lastSync?: string;
   listingCount?: number;
   legalNotice?: string;
+  requiredApiNotice?: string;
 }
 
 export interface SourceConnector {
@@ -71,7 +75,7 @@ export interface SourceConnector {
   getStatus(): SourceConnectorStatus;
   
   // Consistent interface across all Kenyan sources
-  searchProducts(query: SearchQueryAnalysis, locationFilter?: string): Promise<ExternalListing[]>;
+  searchProducts(query: SearchQueryAnalysis, locationFilter?: string, demoMode?: boolean): Promise<ExternalListing[]>;
   getProductDetails(productId: string): Promise<ExternalListing | null>;
   getPrices(query: SearchQueryAnalysis): Promise<ExternalListing[]>;
   getAvailability(productId: string): Promise<'IN_STOCK' | 'OUT_OF_STOCK' | 'ON_ORDER' | 'UNKNOWN'>;

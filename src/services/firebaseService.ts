@@ -81,44 +81,28 @@ const FEEDBACK_COLLECTION = 'feedback';
 const PRICES_COLLECTION = 'prices';
 const CATEGORIES_COLLECTION = 'categories';
 
-// Fetch all products or seed if empty
+// Fetch all community-added and verified products from Firestore
 export async function fetchProductsFromFirestore(): Promise<Product[]> {
   try {
     const querySnapshot = await getDocs(collection(db, PRODUCTS_COLLECTION));
-    if (querySnapshot.empty) {
-      console.log('Seeding initial Kenyan product catalog to Firestore...');
-      await seedInitialCatalog();
-      return INITIAL_PRODUCTS;
-    }
     const products: Product[] = [];
     querySnapshot.forEach(docSnap => {
       products.push(docSnap.data() as Product);
     });
     return products;
   } catch (error) {
-    console.warn('Firestore fetch failed, returning initial catalog as fallback:', error);
-    return INITIAL_PRODUCTS;
+    console.warn('Firestore fetch failed:', error);
+    return [];
   }
 }
 
-// Seed catalog into Firestore
+// Deprecated: No fake retailer data is seeded into Firestore
 export async function seedInitialCatalog(): Promise<void> {
-  for (const product of INITIAL_PRODUCTS) {
-    try {
-      await setDoc(doc(db, PRODUCTS_COLLECTION, product.id), product);
-    } catch (error) {
-      console.warn(`Failed to seed product ${product.id}:`, error);
-      try {
-        handleFirestoreError(error, OperationType.WRITE, `${PRODUCTS_COLLECTION}/${product.id}`);
-      } catch (err) {
-        // Log formatted diagnostic without crashing whole app flow
-        console.error(err);
-      }
-    }
-  }
+  // Intentionally a no-op to prevent injecting fake retailer data into Firestore.
+  // Real community reports and submissions from real shoppers are persisted directly.
 }
 
-// Subscribe to real-time updates of products
+// Subscribe to real-time updates of community and verified products in Firestore
 export function subscribeToProducts(
   onUpdate: (products: Product[]) => void,
   onError?: (err: unknown) => void
@@ -127,18 +111,11 @@ export function subscribeToProducts(
     const unsubscribe = onSnapshot(
       collection(db, PRODUCTS_COLLECTION),
       (snapshot) => {
-        if (!snapshot.empty) {
-          const items: Product[] = [];
-          snapshot.forEach(docSnap => {
-            items.push(docSnap.data() as Product);
-          });
-          onUpdate(items);
-        } else {
-          // If empty in Firestore, trigger background seed
-          seedInitialCatalog().then(() => {
-            onUpdate(INITIAL_PRODUCTS);
-          });
-        }
+        const items: Product[] = [];
+        snapshot.forEach(docSnap => {
+          items.push(docSnap.data() as Product);
+        });
+        onUpdate(items);
       },
       (error) => {
         console.error('Products onSnapshot error:', error);

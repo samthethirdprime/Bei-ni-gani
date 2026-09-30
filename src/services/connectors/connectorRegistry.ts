@@ -50,12 +50,13 @@ class ConnectorRegistry {
   }
 
   /**
-   * Search across all connected Kenyan sources in parallel
+   * Search across all connected Kenyan sources in parallel with per-connector timeout protection
    */
   public async searchAll(
     query: SearchQueryAnalysis,
     locationFilter?: string,
-    categoryFilter?: string
+    categoryFilter?: string,
+    demoMode: boolean = false
   ): Promise<{
     listings: ExternalListing[];
     groupedResults: {
@@ -67,6 +68,7 @@ class ConnectorRegistry {
     const connectors = this.getAllConnectors();
     const queriedSources: string[] = [];
     const allListings: ExternalListing[] = [];
+    const CONNECTOR_TIMEOUT_MS = 3000;
 
     // Filter connectors by category if specific category is set
     const activeConnectors = connectors.filter(conn => {
@@ -78,17 +80,25 @@ class ConnectorRegistry {
     const promises = activeConnectors.map(async conn => {
       try {
         queriedSources.push(conn.displayName);
-        const results = await conn.searchProducts(query, locationFilter);
+        // Timeout guard: if a connector hangs or external resource is blocked, abort after CONNECTOR_TIMEOUT_MS
+        const timeoutPromise = new Promise<ExternalListing[]>((_, reject) =>
+          setTimeout(() => reject(new Error(`Connector ${conn.name} timed out after ${CONNECTOR_TIMEOUT_MS}ms`)), CONNECTOR_TIMEOUT_MS)
+        );
+
+        const results = await Promise.race([
+          conn.searchProducts(query, locationFilter, demoMode),
+          timeoutPromise
+        ]);
         return results;
-      } catch (err) {
-        console.warn(`Error querying source connector ${conn.name}:`, err);
+      } catch (err: any) {
+        console.warn(`[ConnectorRegistry] Issue querying connector ${conn.name}:`, err?.message || err);
         return [];
       }
     });
 
     const settled = await Promise.allSettled(promises);
     for (const res of settled) {
-      if (res.status === 'fulfilled') {
+      if (res.status === 'fulfilled' && Array.isArray(res.value)) {
         allListings.push(...res.value);
       }
     }

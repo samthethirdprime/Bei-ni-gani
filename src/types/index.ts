@@ -1,5 +1,15 @@
 export type PriceType = 'MARKET_RETAIL' | 'COMMUNITY_REPORT' | 'VERIFIED_OFFICIAL';
 
+export type AcquisitionMethod = 
+  | 'direct_api' 
+  | 'direct_webpage' 
+  | 'search_index' 
+  | 'search_snippet' 
+  | 'community' 
+  | 'official' 
+  | 'cache' 
+  | 'demo';
+
 export interface StructuredLocation {
   country?: string; // e.g. "Kenya", "United States", "United Kingdom", "Worldwide"
   countryCode?: string; // "KE", "US", "GB", "GLOBAL", etc.
@@ -28,10 +38,12 @@ export interface VendorPrice {
   location: string;
   country?: string;
   sourceType: 'ONLINE_RETAILER' | 'PHYSICAL_STORE' | 'MARKET_STALL' | 'OFFICIAL' | 'COMMUNITY';
+  acquisitionMethod?: AcquisitionMethod;
   sourceUrl?: string;
   dateCollected: string;
   inStock?: boolean;
   notes?: string;
+  isDemo?: boolean;
 }
 
 export interface PriceRecord {
@@ -89,7 +101,9 @@ export interface Product {
   sourceUrl?: string;
   description: string;
   isCommunityAdded?: boolean;
+  isCommunityCreated?: boolean;
   isRealtimeDiscovered?: boolean;
+  isDemo?: boolean;
   verified?: boolean;
   vendors?: VendorPrice[];
   createdAt: string;

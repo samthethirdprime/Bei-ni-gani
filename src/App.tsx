@@ -58,6 +58,7 @@ export default function App() {
   const [liveSearchFailed, setLiveSearchFailed] = useState(false);
   const [liveSearchFailedMessage, setLiveSearchFailedMessage] = useState<string | undefined>();
   const [lastLiveQueried, setLastLiveQueried] = useState<string>('');
+  const searchRequestIdRef = useRef<number>(0);
   
   // Modals state
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
@@ -87,7 +88,14 @@ export default function App() {
     // 2. Real-time subscription to products
     const unsubscribe = subscribeToProducts((loadedProducts) => {
       if (loadedProducts && loadedProducts.length > 0) {
-        setProducts(loadedProducts);
+        setProducts((prev) => {
+          // Preserve any live-discovered products currently in memory so Firestore snapshot updates don't clear them
+          const liveDiscovered = prev.filter(p => p.isRealtimeDiscovered);
+          if (liveDiscovered.length === 0) return loadedProducts;
+          const loadedIds = new Set(loadedProducts.map(p => p.id));
+          const nonPersistedLive = liveDiscovered.filter(p => !loadedIds.has(p.id));
+          return [...nonPersistedLive, ...loadedProducts];
+        });
       }
     });
 
@@ -263,10 +271,37 @@ export default function App() {
     return searchResults.filter(group.matcher);
   }, [searchResults, selectedVariantFilter, availableVariants]);
 
+  // Partition results by source type so demo data NEVER impersonates live data
+  const categorizedResults = useMemo(() => {
+    const live: Product[] = [];
+    const official: Product[] = [];
+    const community: Product[] = [];
+    const demo: Product[] = [];
+
+    displayedResults.forEach(p => {
+      if (p.isDemo) {
+        demo.push(p);
+      } else if (p.priceType === 'VERIFIED_OFFICIAL') {
+        official.push(p);
+      } else if (p.isRealtimeDiscovered || (p.verified && !p.isDemo && p.priceType !== 'COMMUNITY_REPORT')) {
+        live.push(p);
+      } else if (p.priceType === 'COMMUNITY_REPORT' || p.isCommunityAdded || p.isCommunityCreated) {
+        community.push(p);
+      } else {
+        demo.push(p);
+      }
+    });
+
+    return { live, official, community, demo };
+  }, [displayedResults]);
+
   // Perform Live Real-time Price Discovery across Kenyan sources
   const performLiveSearch = useCallback(async (queryToSearch: string) => {
     const trimmed = queryToSearch.trim();
     if (!trimmed || trimmed.length < 2) return;
+
+    // Track request sequence to prevent older or late-arriving requests from overwriting newer ones
+    const currentRequestId = ++searchRequestIdRef.current;
 
     setIsLiveSearching(true);
     setLiveSearchFailed(false);
@@ -280,12 +315,22 @@ export default function App() {
         selectedCategory !== 'all' ? selectedCategory : undefined
       );
 
+      // Guard: Ignore response if a newer search request has been triggered in the meantime
+      if (currentRequestId !== searchRequestIdRef.current) {
+        return;
+      }
+
       if (result.verified && result.product) {
         const discovered = result.product;
         // Persist to Firestore
         await saveDiscoveredProduct(discovered);
-        
-        // Update local state immediately
+
+        // Guard again after async save in case request was superseded
+        if (currentRequestId !== searchRequestIdRef.current) {
+          return;
+        }
+
+        // Search results are only updated if the new response contains at least one product
         setProducts((prev) => {
           const filtered = prev.filter(p => p.id !== discovered.id && p.name.toLowerCase() !== discovered.name.toLowerCase());
           return [discovered, ...filtered];
@@ -295,11 +340,29 @@ export default function App() {
         setLiveSearchFailed(false);
         showToast(`✓ Verified live prices found across ${discovered.vendors?.length || 3} Kenyan vendors!`);
       } else {
+        // Late-arriving or empty response:
+        // Prevent an empty response from clearing valid results rendered by a previous, successful request
         setIsLiveSearching(false);
-        setLiveSearchFailed(true);
-        setLiveSearchFailedMessage(result.message || "We couldn't find a verified current price for this item.");
+        setProducts((prev) => {
+          // Check if previous successful requests already populated matching products for this query
+          const hasExistingMatches = prev.some(p => {
+            const nameLower = p.name.toLowerCase();
+            const qTokens = trimmed.toLowerCase().split(/\s+/).filter(t => t.length > 1);
+            return qTokens.length > 0 && qTokens.every(tok => nameLower.includes(tok));
+          });
+          if (!hasExistingMatches) {
+            setLiveSearchFailed(true);
+            setLiveSearchFailedMessage(result.message || "We couldn't find a verified current price for this item.");
+          } else {
+            setLiveSearchFailed(false);
+          }
+          return prev;
+        });
       }
     } catch (err) {
+      if (currentRequestId !== searchRequestIdRef.current) {
+        return;
+      }
       console.error('Error during real-time search:', err);
       setIsLiveSearching(false);
       setLiveSearchFailed(true);
@@ -307,7 +370,7 @@ export default function App() {
     }
   }, [selectedLocation, selectedCategory, queryAnalysis.detectedLocation]);
 
-  // Auto-trigger live search if no internal results found (with debouncing)
+  // Auto-trigger live search across connected external sources with debouncing
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -319,25 +382,19 @@ export default function App() {
 
     // Reset failed state if query cleared
     if (!trimmed) {
+      searchRequestIdRef.current++;
       setIsLiveSearching(false);
       setLiveSearchFailed(false);
+      setLiveSearchFailedMessage(undefined);
       setLastLiveQueried('');
       return;
     }
 
-    // If internal results are present, do not auto-fail
-    if (searchResults.length > 0) {
-      setLiveSearchFailed(false);
-      setIsLiveSearching(false);
-      return;
-    }
-
-    // If NO internal results and query is substantial and not already queried
-    if (searchResults.length === 0 && trimmed.length >= 3 && trimmed.toLowerCase() !== lastLiveQueried && !isLiveSearching) {
-      setIsLiveSearching(true);
+    // Trigger live external discovery for queries of 2+ chars if not already queried
+    if (trimmed.length >= 2 && trimmed.toLowerCase() !== lastLiveQueried) {
       debounceTimerRef.current = setTimeout(() => {
         performLiveSearch(trimmed);
-      }, 1300);
+      }, 750);
     }
 
     return () => {
@@ -345,7 +402,7 @@ export default function App() {
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [searchQuery, searchResults.length, lastLiveQueried, performLiveSearch]);
+  }, [searchQuery, lastLiveQueried, performLiveSearch]);
 
   // Refresh live vendors for a specific product inside modal
   const handleRefreshProductVendors = async (product: Product) => {
@@ -444,6 +501,7 @@ export default function App() {
   };
 
   const handleClearSearch = () => {
+    searchRequestIdRef.current++;
     setSearchQuery('');
     setLiveSearchFailed(false);
     setIsLiveSearching(false);
@@ -584,6 +642,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => {
+                searchRequestIdRef.current++;
                 setSearchQuery('');
                 setSelectedCategory('all');
                 setSelectedLocation('');
@@ -596,23 +655,28 @@ export default function App() {
           )}
         </div>
 
-        {/* Live Search Discovery Banner if internal matches already exist */}
-        {searchQuery.trim().length >= 2 && searchResults.length > 0 && !isLiveSearching && (
-          <div className="bg-neutral-900/60 border border-emerald-800/40 rounded-2xl p-3 flex items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2 text-neutral-300">
-              <Sparkles className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+        {/* Live Search Scanning Status Banner */}
+        {isLiveSearching && (
+          <div className="bg-neutral-900/80 border border-emerald-500/50 rounded-2xl p-4 flex items-center justify-between gap-3 text-xs shadow-lg animate-pulse">
+            <div className="flex items-center gap-2.5 text-neutral-200">
+              <Loader2 className="w-4 h-4 text-emerald-400 animate-spin flex-shrink-0" />
               <span>
-                Showing catalog matches. Want to scan more live Kenyan online retailers & markets for <strong className="text-white">"{searchQuery}"</strong>?
+                Searching live Kenyan external sources (Jumia, Jiji, online retailers & community data) for <strong className="text-white">"{searchQuery}"</strong>...
               </span>
             </div>
+          </div>
+        )}
 
-            <button
-              onClick={() => performLiveSearch(searchQuery)}
-              className="flex-shrink-0 px-3 py-1.5 rounded-xl bg-emerald-950 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-300 font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
-            >
-              <Store className="w-3.5 h-3.5 text-amber-400" />
-              <span>Scan More Sources</span>
-            </button>
+        {/* Honest Live Search Status Notification when 0 live results found */}
+        {searchQuery.trim().length >= 2 && !isLiveSearching && liveSearchFailed && categorizedResults.live.length === 0 && (
+          <div className="bg-amber-950/30 border border-amber-800/60 rounded-2xl p-4 text-xs space-y-2">
+            <div className="flex items-center gap-2 text-amber-300 font-bold">
+              <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+              <span>No live results available from connected external sources for "{searchQuery}".</span>
+            </div>
+            <p className="text-neutral-400">
+              The connected external providers returned 0 current listings for this query. Any products displayed below are community reports or benchmark reference data (clearly labeled).
+            </p>
           </div>
         )}
 
@@ -633,20 +697,6 @@ export default function App() {
               setShowAddItemModal(true);
             }}
             onOpenLocationModal={() => setShowLocationModal(true)}
-          />
-        )}
-
-        {/* Live Search Scanning / Fallback Area (when no strict location issue) */}
-        {(isLiveSearching || (searchResults.length === 0 && searchQuery.trim().length >= 2 && !(selectedLocation || queryAnalysis.detectedLocation))) && (
-          <LiveSearchScanner
-            query={searchQuery}
-            identifiedName={queryAnalysis.canonicalName || queryAnalysis.itemQuery}
-            isSearching={isLiveSearching}
-            searchFailed={liveSearchFailed}
-            failedMessage={liveSearchFailedMessage}
-            onOpenAddItem={handleOpenAddItemWithQuery}
-            onSelectExample={handleSelectExample}
-            onRetry={() => performLiveSearch(searchQuery)}
           />
         )}
 
@@ -685,8 +735,98 @@ export default function App() {
           </div>
         )}
 
-        {/* Product Cards Grid */}
-        {displayedResults.length > 0 && (
+        {/* Grouped Product Results when Search Query is Active */}
+        {searchQuery.trim().length >= 2 && displayedResults.length > 0 ? (
+          <div className="space-y-6">
+            {/* 1. Live Discovered Results */}
+            {categorizedResults.live.length > 0 && (
+              <section className="space-y-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-teal-400 uppercase tracking-wider">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Live Discovered External Results ({categorizedResults.live.length})</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {categorizedResults.live.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      onSelect={handleSelectProduct}
+                      onQuickConfirm={handleQuickConfirm}
+                      onOpenReportModal={(p) => setIssueModalProduct({ product: p, mode: 'report' })}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* 2. Official Government / Gazette Tariffs */}
+            {categorizedResults.official.length > 0 && (
+              <section className="space-y-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 uppercase tracking-wider">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Official Government Tariffs & Gazette Caps ({categorizedResults.official.length})</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {categorizedResults.official.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      onSelect={handleSelectProduct}
+                      onQuickConfirm={handleQuickConfirm}
+                      onOpenReportModal={(p) => setIssueModalProduct({ product: p, mode: 'report' })}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* 3. Community Shopper Reports */}
+            {categorizedResults.community.length > 0 && (
+              <section className="space-y-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-blue-400 uppercase tracking-wider">
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  <span>Community Shopper Reports ({categorizedResults.community.length})</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {categorizedResults.community.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      onSelect={handleSelectProduct}
+                      onQuickConfirm={handleQuickConfirm}
+                      onOpenReportModal={(p) => setIssueModalProduct({ product: p, mode: 'report' })}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* 4. Demo Data Benchmarks */}
+            {categorizedResults.demo.length > 0 && (
+              <section className="space-y-3 pt-2 border-t border-neutral-800/80">
+                <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase tracking-wider">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  <span>Reference Benchmark Samples [DEMO DATA - NOT LIVE] ({categorizedResults.demo.length})</span>
+                </div>
+                <p className="text-[11px] text-neutral-500">
+                  These items are reference catalog samples and are not retrieved from current live marketplace scans.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 opacity-90">
+                  {categorizedResults.demo.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      onSelect={handleSelectProduct}
+                      onQuickConfirm={handleQuickConfirm}
+                      onOpenReportModal={(p) => setIssueModalProduct({ product: p, mode: 'report' })}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
+        ) : displayedResults.length > 0 ? (
+          /* Default Catalog Grid (when no search query entered) */
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {displayedResults.map((product) => (
               <ProductCard
@@ -698,6 +838,20 @@ export default function App() {
               />
             ))}
           </div>
+        ) : (
+          /* Fallback when 0 items exist anywhere for query */
+          !isLiveSearching && (
+            <LiveSearchScanner
+              query={searchQuery}
+              identifiedName={queryAnalysis.canonicalName || queryAnalysis.itemQuery}
+              isSearching={isLiveSearching}
+              searchFailed={liveSearchFailed}
+              failedMessage={liveSearchFailedMessage}
+              onOpenAddItem={handleOpenAddItemWithQuery}
+              onSelectExample={handleSelectExample}
+              onRetry={() => performLiveSearch(searchQuery)}
+            />
+          )
         )}
 
         {/* When variant filter narrows to 0 items */}

@@ -1035,16 +1035,19 @@ export function searchProducts(
 // Convert GroupedProductComparison from Multi-Source Connectors to unified Product format
 export function convertGroupedToProduct(group: GroupedProductComparison, targetLocation?: string): Product {
   const rep = group.listings[0];
+  const hasDemoListing = group.listings.some(l => l.isDemo);
+
   const vendors: VendorPrice[] = group.listings.map((l, index) => ({
     id: `v-conn-${index}-${Date.now()}`,
     vendorName: l.vendor,
     price: l.price,
     unit: l.variant || 'unit',
     location: l.location,
-    sourceType: l.sourceCategory === 'COMMUNITY' ? 'COMMUNITY' : (l.sourceCategory === 'SUPERMARKET' ? 'PHYSICAL_STORE' : 'ONLINE_RETAILER'),
+    sourceType: l.sourceCategory === 'COMMUNITY' ? 'COMMUNITY' : (l.sourceCategory === 'SUPERMARKET' ? 'PHYSICAL_STORE' : (l.sourceCategory === 'OFFICIAL_REGULATOR' ? 'OFFICIAL' : 'ONLINE_RETAILER')),
     sourceUrl: l.sourceUrl,
     dateCollected: l.dateCollected,
     inStock: l.availability !== 'OUT_OF_STOCK',
+    isDemo: l.isDemo,
     notes: l.notes || `Source: ${l.source} (${l.sourceMethod.replace('_', ' ')})`
   }));
 
@@ -1061,57 +1064,51 @@ export function convertGroupedToProduct(group: GroupedProductComparison, targetL
     typicalPrice: group.typicalPrice,
     minPrice: group.lowestPrice,
     maxPrice: group.highestPrice,
-    priceType: 'MARKET_RETAIL',
+    priceType: hasDemoListing ? 'MARKET_RETAIL' : (rep.sourceCategory === 'OFFICIAL_REGULATOR' ? 'VERIFIED_OFFICIAL' : (rep.sourceCategory === 'COMMUNITY' ? 'COMMUNITY_REPORT' : 'MARKET_RETAIL')),
     county: rep.county || targetLocation || 'Kenya',
     town: rep.town || rep.location,
     area: rep.area || rep.location,
     retailerOrSource: group.distinctVendors.slice(0, 3).join(', '),
-    dateCollected: 'Live Multi-Source Aggregation',
+    dateCollected: hasDemoListing ? 'Sample Benchmark' : 'Live Multi-Source Aggregation',
     reportsCount: group.sourcesCount,
     confirmsCount: 1,
     outdatesCount: 0,
     flaggedCount: 0,
     sourceUrl: rep.sourceUrl,
-    description: `Price comparison aggregated across ${group.sourcesCount} verified Kenyan sources (${group.distinctVendors.join(', ')}). Lowest: KSh ${group.lowestPrice.toLocaleString()} | Highest: KSh ${group.highestPrice.toLocaleString()}.`,
-    isRealtimeDiscovered: true,
-    verified: true,
+    description: hasDemoListing 
+      ? `[DEMO DATA] Reference benchmark price index. Not verified live.`
+      : `Price comparison aggregated across ${group.sourcesCount} verified Kenyan sources (${group.distinctVendors.join(', ')}). Lowest: KSh ${group.lowestPrice.toLocaleString()} | Highest: KSh ${group.highestPrice.toLocaleString()}.`,
+    isRealtimeDiscovered: !hasDemoListing,
+    isDemo: hasDemoListing,
+    verified: !hasDemoListing,
     vendors,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
 }
 
-// Real-time live dynamic multi-source search query
+// Real-time live dynamic multi-source search query with timeout & truthfulness
 export async function searchRealtimePrice(
   rawQuery: string,
   county?: string,
-  category?: string
+  category?: string,
+  demoMode: boolean = false
 ): Promise<{ product: Product | null; verified: boolean; message?: string; sources?: string[] }> {
   const analysis = analyzeSearchQuery(rawQuery);
   const targetLocation = county || analysis.detectedLocation;
 
-  // 1. First, search connected Kenyan sources (Jumia, Kilimall, Jiji, Supermarkets, Official EPRA, Specialty Retailers, Community)
+  // 1. Query server backend for live web discovery with search grounding (Primary real live source)
   try {
-    const connectorResult = await connectorRegistry.searchAll(analysis, targetLocation, category);
-    if (connectorResult.groupedResults.primaryGroup && connectorResult.groupedResults.primaryGroup.listings.length > 0) {
-      const unifiedProduct = convertGroupedToProduct(connectorResult.groupedResults.primaryGroup, targetLocation);
-      return {
-        verified: true,
-        product: unifiedProduct,
-        sources: connectorResult.queriedSources
-      };
-    }
-  } catch (connectorErr) {
-    console.warn('Connector search encountered an issue, trying backend endpoint:', connectorErr);
-  }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 9500);
 
-  // 2. Query server backend for live web discovery
-  try {
     const res = await fetch('/api/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: rawQuery, county: targetLocation, category }),
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
 
     if (res.ok) {
       const data = await res.json();
@@ -1120,15 +1117,28 @@ export async function searchRealtimePrice(
       }
     }
   } catch (err: any) {
-    console.warn('Backend search API failed or offline:', err);
+    console.warn('[SearchEngine] Backend live discovery search note:', err?.message || err);
   }
 
-  // If no verified data found across connectors or live APIs
+  // 2. Search connected Kenyan sources (Firestore Community Reports, EPRA official caps, and demo connectors if demoMode=true)
+  try {
+    const connectorResult = await connectorRegistry.searchAll(analysis, targetLocation, category, demoMode);
+    if (connectorResult.groupedResults.primaryGroup && connectorResult.groupedResults.primaryGroup.listings.length > 0) {
+      const unifiedProduct = convertGroupedToProduct(connectorResult.groupedResults.primaryGroup, targetLocation);
+      return {
+        verified: !unifiedProduct.isDemo,
+        product: unifiedProduct,
+        sources: connectorResult.queriedSources
+      };
+    }
+  } catch (connectorErr) {
+    console.warn('[SearchEngine] Connector search note:', connectorErr);
+  }
+
+  // 3. If no verified live price found across connected sources
   return {
     verified: false,
     product: null,
-    message: targetLocation 
-      ? `No verified results found in ${targetLocation}.`
-      : "No verified current price found."
+    message: "No verified current price found."
   };
 }

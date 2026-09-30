@@ -142,14 +142,10 @@ export const LiveSearchScanner: React.FC<LiveSearchScannerProps> = ({
             {displayName}
           </div>
           <h3 className="text-lg sm:text-xl font-bold text-white font-['Space_Grotesk']">
-            No verified current price found.
+            {failedMessage || "No live results available from the connected sources."}
           </h3>
           <p className="text-xs text-neutral-400 leading-relaxed">
-            {failedMessage || (
-              <>
-                We checked legitimate Kenyan retailers, supermarkets, and public catalogs for <strong className="text-neutral-200">"{displayName}"</strong>, but no verified price was found. Bei Gani never manufactures or guesses prices.
-              </>
-            )}
+            We searched connected external retailers, supermarket catalogs, and community reports for <strong className="text-neutral-200">"{displayName}"</strong>, but no verified price was found. Bei Gani never manufactures or guesses prices.
           </p>
         </div>
 

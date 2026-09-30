@@ -95,13 +95,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                   {product.sizeOrQuantity}
                 </span>
               )}
-              {product.priceType === 'VERIFIED_OFFICIAL' ? (
+              {product.isDemo ? (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-950 text-amber-400 border border-amber-800/80 flex items-center gap-1">
+                  DEMO DATA
+                </span>
+              ) : product.priceType === 'VERIFIED_OFFICIAL' ? (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/80 flex items-center gap-1">
                   <ShieldCheck className="w-3 h-3" /> Official
                 </span>
               ) : product.verified || product.isRealtimeDiscovered ? (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-950 text-teal-300 border border-teal-800/80 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3" /> Verified
+                  <Sparkles className="w-3 h-3" /> Verified Live
                 </span>
               ) : (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400 border border-neutral-700/60">

@@ -135,8 +135,24 @@ export const VendorComparisonList: React.FC<VendorComparisonListProps> = ({
                     </span>
                   )}
 
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400 border border-neutral-700/60">
-                    {vendor.sourceType === 'ONLINE_RETAILER' ? 'Online' : vendor.sourceType === 'MARKET_STALL' ? 'Open Market' : 'Store'}
+                  {(vendor.isDemo || product.isDemo) && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-950 text-amber-400 border border-amber-800/80">
+                      DEMO DATA
+                    </span>
+                  )}
+
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300 border border-neutral-700/60">
+                    {vendor.acquisitionMethod === 'direct_api' 
+                      ? 'Direct API' 
+                      : vendor.acquisitionMethod === 'direct_webpage'
+                      ? 'Webpage Structured Data'
+                      : vendor.acquisitionMethod === 'search_snippet'
+                      ? 'Search Snippet'
+                      : vendor.acquisitionMethod === 'community'
+                      ? 'Community Report'
+                      : vendor.acquisitionMethod === 'official'
+                      ? 'Official Gazette'
+                      : vendor.sourceType === 'ONLINE_RETAILER' ? 'Online' : 'Store'}
                   </span>
                 </div>
 

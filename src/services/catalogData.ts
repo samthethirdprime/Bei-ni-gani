@@ -1,6 +1,6 @@
 import { Product } from '../types';
 
-export const INITIAL_PRODUCTS: Product[] = [
+const RAW_INITIAL_PRODUCTS: Product[] = [
   // GROCERIES & FOOD
   {
     id: 'prod-beef-meat',
@@ -1694,6 +1694,13 @@ export const INITIAL_PRODUCTS: Product[] = [
   }
 ];
 
+export const INITIAL_PRODUCTS: Product[] = RAW_INITIAL_PRODUCTS.map(p => ({
+  ...p,
+  isDemo: true,
+  verified: false,
+  retailerOrSource: p.retailerOrSource.includes('[DEMO DATA]') ? p.retailerOrSource : `${p.retailerOrSource} [DEMO DATA]`
+}));
+
 // Helper to create timestamp days ago
 const daysAgo = (days: number): string => {
   const d = new Date();
@@ -1701,7 +1708,7 @@ const daysAgo = (days: number): string => {
   return d.toISOString();
 };
 
-export const INITIAL_COMMUNITY_REPORTS = [
+const RAW_COMMUNITY_REPORTS = [
   // Beef reports
   {
     id: 'rep-beef-1',
@@ -2138,3 +2145,9 @@ export const INITIAL_COMMUNITY_REPORTS = [
     createdAt: daysAgo(2)
   }
 ];
+
+export const INITIAL_COMMUNITY_REPORTS = RAW_COMMUNITY_REPORTS.map(r => ({
+  ...r,
+  notes: r.notes ? `[DEMO DATA] ${r.notes}` : '[DEMO DATA] Reference community submission'
+}));
+

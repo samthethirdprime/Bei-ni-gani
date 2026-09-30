@@ -15,21 +15,28 @@ export class SpecialtyRetailersConnector implements SourceConnector {
   readonly supportedCategories = ['electronics', 'footwear', 'hardware', 'personal_care'];
 
   isConfigured(): boolean {
-    return true;
+    return false;
   }
 
   getStatus(): SourceConnectorStatus {
     return {
       online: true,
-      isConfigured: true,
+      isConfigured: false,
+      isRealConnection: false,
+      connectionType: 'ENTERPRISE_API_REQUIRED',
       accessMethod: this.accessMethod,
       sourceCategory: this.sourceCategory,
       lastSync: new Date().toISOString(),
-      legalNotice: 'Authorized dealer catalog prices collected across top Kenyan specialty brand stores.'
+      legalNotice: 'Authorized dealer catalog prices across Kenyan specialty brand stores (Phoneplace, Hotpoint, Bamburi).',
+      requiredApiNotice: 'Direct 1P integration requires brand retailer partner merchant feeds. Live queries are performed via Bei Gani? Real-Time Search Grounding proxy.'
     };
   }
 
-  async searchProducts(query: SearchQueryAnalysis, locationFilter?: string): Promise<ExternalListing[]> {
+  async searchProducts(query: SearchQueryAnalysis, locationFilter?: string, demoMode: boolean = false): Promise<ExternalListing[]> {
+    if (!demoMode) {
+      return [];
+    }
+
     const q = query.itemQuery.toLowerCase();
     const listings: ExternalListing[] = [];
 
@@ -121,7 +128,13 @@ export class SpecialtyRetailersConnector implements SourceConnector {
       });
     }
 
-    return listings;
+    return listings.map(l => ({
+      ...l,
+      isDemo: true,
+      isVerified: false,
+      vendor: l.vendor.includes('[DEMO DATA]') ? l.vendor : `${l.vendor} [DEMO DATA]`,
+      notes: l.notes ? `[DEMO DATA] ${l.notes}` : '[DEMO DATA] Reference benchmark sample - source not directly connected'
+    }));
   }
 
   async getProductDetails(productId: string): Promise<ExternalListing | null> {

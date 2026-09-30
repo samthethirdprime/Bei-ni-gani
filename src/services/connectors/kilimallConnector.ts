@@ -14,21 +14,28 @@ export class KilimallConnector implements SourceConnector {
   readonly supportedCategories = ['electronics', 'household', 'clothing', 'footwear'];
 
   isConfigured(): boolean {
-    return true;
+    return false;
   }
 
   getStatus(): SourceConnectorStatus {
     return {
       online: true,
-      isConfigured: true,
+      isConfigured: false,
+      isRealConnection: false,
+      connectionType: 'ENTERPRISE_API_REQUIRED',
       accessMethod: this.accessMethod,
       sourceCategory: this.sourceCategory,
       lastSync: new Date().toISOString(),
-      legalNotice: 'Real-time price quotes aggregated from verified Kilimall Global & Local merchants.'
+      legalNotice: 'Kilimall seller catalog index. Direct integration requires Kilimall Merchant/Open API.',
+      requiredApiNotice: 'Direct 1P integration requires Kilimall Open Platform credentials. Live queries are performed via Bei Gani? Real-Time Search Grounding proxy.'
     };
   }
 
-  async searchProducts(query: SearchQueryAnalysis, locationFilter?: string): Promise<ExternalListing[]> {
+  async searchProducts(query: SearchQueryAnalysis, locationFilter?: string, demoMode: boolean = false): Promise<ExternalListing[]> {
+    if (!demoMode) {
+      return [];
+    }
+
     const q = query.itemQuery.toLowerCase();
     const listings: ExternalListing[] = [];
 
@@ -111,7 +118,13 @@ export class KilimallConnector implements SourceConnector {
       });
     }
 
-    return listings;
+    return listings.map(l => ({
+      ...l,
+      isDemo: true,
+      isVerified: false,
+      vendor: l.vendor.includes('[DEMO DATA]') ? l.vendor : `${l.vendor} [DEMO DATA]`,
+      notes: l.notes ? `[DEMO DATA] ${l.notes}` : '[DEMO DATA] Reference benchmark sample - source not directly connected'
+    }));
   }
 
   async getProductDetails(productId: string): Promise<ExternalListing | null> {

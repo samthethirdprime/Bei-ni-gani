@@ -15,21 +15,28 @@ export class SocialCommerceConnector implements SourceConnector {
   readonly supportedCategories = ['clothing', 'footwear', 'household', 'furniture', 'electronics'];
 
   isConfigured(): boolean {
-    return true;
+    return false;
   }
 
   getStatus(): SourceConnectorStatus {
     return {
       online: true,
-      isConfigured: true,
+      isConfigured: false,
+      isRealConnection: false,
+      connectionType: 'ENTERPRISE_API_REQUIRED',
       accessMethod: this.accessMethod,
       sourceCategory: this.sourceCategory,
       lastSync: new Date().toISOString(),
-      legalNotice: 'Permitted public price benchmarks from verified Kenyan social merchants, boutique sellers & open market livestreams in Gikomba, Kamukunji & Eastleigh.'
+      legalNotice: 'Kenyan social merchant indices (Instagram, TikTok shops, open market sellers).',
+      requiredApiNotice: 'Direct 1P integration requires Meta Graph API / TikTok Shop Merchant credentials. Live queries are performed via Bei Gani? Real-Time Search Grounding proxy.'
     };
   }
 
-  async searchProducts(query: SearchQueryAnalysis, locationFilter?: string): Promise<ExternalListing[]> {
+  async searchProducts(query: SearchQueryAnalysis, locationFilter?: string, demoMode: boolean = false): Promise<ExternalListing[]> {
+    if (!demoMode) {
+      return [];
+    }
+
     const q = query.itemQuery.toLowerCase();
     const listings: ExternalListing[] = [];
 
@@ -143,7 +150,13 @@ export class SocialCommerceConnector implements SourceConnector {
       });
     }
 
-    return listings;
+    return listings.map(l => ({
+      ...l,
+      isDemo: true,
+      isVerified: false,
+      vendor: l.vendor.includes('[DEMO DATA]') ? l.vendor : `${l.vendor} [DEMO DATA]`,
+      notes: l.notes ? `[DEMO DATA] ${l.notes}` : '[DEMO DATA] Reference benchmark sample - source not directly connected'
+    }));
   }
 
   async getProductDetails(productId: string): Promise<ExternalListing | null> {
