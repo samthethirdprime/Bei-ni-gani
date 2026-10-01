@@ -5,6 +5,7 @@ import { WebSearchProvider } from './webSearchProvider';
 import { JumiaProvider } from './jumiaProvider';
 import { KilimallProvider } from './kilimallProvider';
 import { JijiProvider } from './jijiProvider';
+import { MasokoProvider } from './masokoProvider';
 import { SupermarketsProvider } from './supermarketsProvider';
 
 export class SearchAggregator {
@@ -18,6 +19,7 @@ export class SearchAggregator {
       new JumiaProvider(),
       new KilimallProvider(),
       new JijiProvider(),
+      new MasokoProvider(),
       new SupermarketsProvider()
     ];
   }

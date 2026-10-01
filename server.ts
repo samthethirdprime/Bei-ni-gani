@@ -125,6 +125,14 @@ app.get('/api/connectors/status', (req, res) => {
         description: 'Direct programmatic sync requires Genesis Tech / Jiji Partner API credentials.'
       },
       {
+        id: 'masoko-ke',
+        name: 'Safaricom Masoko Direct Feed',
+        status: 'REQUIRES_PARTNER_CREDENTIALS',
+        isRealConnection: false,
+        type: 'ENTERPRISE_API_REQUIRED',
+        description: 'Direct catalog sync requires Safaricom Masoko partner merchant credentials.'
+      },
+      {
         id: 'supermarkets-ke',
         name: 'Kenyan Supermarkets Direct ERP Feeds',
         status: 'REQUIRES_PARTNER_CREDENTIALS',

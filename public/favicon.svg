@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+    <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399" />
+      <stop offset="50%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+    <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fcd34d" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="512" height="512" rx="108" fill="url(#bgGrad)" />
+  <rect width="504" height="504" x="4" y="4" rx="104" fill="none" stroke="#10b981" stroke-width="4" stroke-opacity="0.3" />
+  
+  <!-- Central Badge (Price Tag / Shield) -->
+  <path d="M140 160 C140 130, 160 110, 190 110 L322 110 C352 110, 372 130, 372 160 L372 320 C372 370, 320 405, 256 425 C192 405, 140 370, 140 320 Z" fill="url(#emeraldGrad)" />
+
+  <!-- Tag eyelet circle -->
+  <circle cx="256" cy="165" r="18" fill="#09090b" />
+
+  <!-- Letter 'B' monogram -->
+  <path d="M 200 215 L 255 215 C 275 215, 288 225, 288 242 C 288 255, 280 263, 268 266 C 283 270, 292 280, 292 296 C 292 315, 276 325, 255 325 L 200 325 Z M 224 235 L 224 260 L 252 260 C 262 260, 268 255, 268 247 C 268 240, 262 235, 252 235 Z M 224 280 L 224 305 L 254 305 C 265 305, 272 299, 272 292 C 272 285, 265 280, 254 280 Z" fill="#ffffff" />
+
+  <!-- Golden '?' indicator -->
+  <path d="M 306 230 C 306 215, 318 205, 334 205 C 350 205, 362 215, 362 230 C 362 245, 348 252, 340 262 C 336 267, 335 273, 335 280 L 321 280 C 321 270, 323 262, 330 254 C 337 246, 347 240, 347 230 C 347 222, 341 217, 334 217 C 327 217, 321 222, 321 230 Z M 321 298 L 337 298 L 337 314 L 321 314 Z" fill="url(#amberGrad)" />
+</svg>
