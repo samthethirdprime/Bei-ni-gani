@@ -1,12 +1,12 @@
 {
-  "projectId": "gen-lang-client-0985627508",
-  "appId": "1:562881597986:web:147262969b4a2a59d7f07b",
-  "apiKey": "AIzaSyBRe-A-UM6SnKb5S8rPWuGGMQDnOM29dAQ",
-  "authDomain": "gen-lang-client-0985627508.firebaseapp.com",
-  "storageBucket": "gen-lang-client-0985627508.firebasestorage.app",
-  "messagingSenderId": "562881597986",
+  "projectId": "bei-gani",
+  "appId": "1:767999742691:web:1b40ac7c78b81ace096bd6",
+  "apiKey": "AIzaSyDasAVyfSJg-3LAkkbkVFpSl82Lc",
+  "authDomain": "bei-gani.firebaseapp.com",
+  "storageBucket": "bei-gani.firebasestorage.app",
+  "messagingSenderId": "767999742691",
   "measurementId": "",
-  "oAuthClientId": "562881597986-dqa9u1j3uf9hu5i23cdq6n6vho1amb8l.apps.googleusercontent.com",
+  "oAuthClientId": "",
   "recaptchaSiteKey": "",
-  "firestoreDatabaseId": "ai-studio-55344e79-4dac-4650-9c91-1717a9196266"
+  "firestoreDatabaseId": "(default)"
 }
