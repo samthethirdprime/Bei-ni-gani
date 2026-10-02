@@ -53,30 +53,30 @@ export const Header: React.FC<HeaderProps> = ({
   const locationBadge = (selectedLocation || selectedCounty) ? (selectedLocation || selectedCounty) : 'Worldwide';
 
   return (
-    <header className="sticky top-0 z-30 bg-neutral-950/90 backdrop-blur-md border-b border-neutral-800/80 px-4 py-3">
-      <div className="max-w-5xl mx-auto flex items-center justify-between gap-3">
+    <header className="sticky top-0 z-30 bg-neutral-950/90 backdrop-blur-md border-b border-neutral-800/80 px-4 py-3 w-full max-w-full">
+      <div className="max-w-5xl w-full mx-auto flex items-center justify-between gap-2 sm:gap-3 min-w-0">
         {/* Logo & Tagline */}
-        <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center font-black text-white text-xl shadow-lg shadow-emerald-950/50 border border-emerald-400/30">
+        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-shrink">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center font-black text-white text-lg sm:text-xl shadow-lg shadow-emerald-950/50 border border-emerald-400/30 flex-shrink-0">
             BG
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <h1 className="text-xl font-extrabold tracking-tight text-white font-['Space_Grotesk']">
+              <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-white font-['Space_Grotesk'] truncate">
                 BEI GANI<span className="text-emerald-400">?</span>
               </h1>
               <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60 hidden sm:inline-block">
                 GLOBAL
               </span>
             </div>
-            <p className="text-xs text-neutral-400 font-medium tracking-tight">
+            <p className="text-[11px] sm:text-xs text-neutral-400 font-medium tracking-tight truncate hidden md:block">
               Before unask bei, check bei.
             </p>
           </div>
         </div>
 
         {/* Right side controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
           {/* Worldwide Location Selector Button */}
           <button
             type="button"
@@ -87,7 +87,7 @@ export const Header: React.FC<HeaderProps> = ({
                 onOpenLocationModal();
               }
             }}
-            className="flex items-center gap-1.5 bg-neutral-900 hover:bg-neutral-800 active:bg-neutral-700 text-xs font-semibold text-neutral-200 border border-neutral-800 hover:border-neutral-700 rounded-xl px-2.5 py-1.5 transition-all max-w-[140px] sm:max-w-[200px] cursor-pointer shadow-sm select-none"
+            className="flex items-center gap-1 sm:gap-1.5 bg-neutral-900 hover:bg-neutral-800 active:bg-neutral-700 text-xs font-semibold text-neutral-200 border border-neutral-800 hover:border-neutral-700 rounded-xl px-2 sm:px-2.5 py-1.5 transition-all max-w-[105px] xs:max-w-[130px] sm:max-w-[200px] cursor-pointer shadow-sm select-none"
             title="Select Worldwide or Kenyan Location"
             aria-label={`Select location (currently ${locationBadge})`}
           >

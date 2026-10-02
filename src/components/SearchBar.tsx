@@ -108,32 +108,32 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
       {/* Query Location Indicator or Active Location Badge */}
       {queryAnalysis.detectedLocation ? (
-        <div className="mt-2 flex items-center justify-between text-xs text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-3 py-1.5 rounded-lg w-fit gap-2">
-          <div className="flex items-center gap-1.5">
-            <MapPin className="w-3.5 h-3.5" />
-            <span>Searching item: <strong className="text-white">"{queryAnalysis.itemQuery}"</strong> in <strong className="text-white">{queryAnalysis.detectedLocation}</strong></span>
+        <div className="mt-2 flex items-center justify-between text-xs text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-3 py-1.5 rounded-lg max-w-full w-fit gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="break-words">Searching item: <strong className="text-white">"{queryAnalysis.itemQuery}"</strong> in <strong className="text-white">{queryAnalysis.detectedLocation}</strong></span>
           </div>
           {onOpenLocationModal && (
             <button
               type="button"
               onClick={onOpenLocationModal}
-              className="text-[11px] font-bold text-emerald-300 hover:text-white underline ml-2 cursor-pointer"
+              className="text-[11px] font-bold text-emerald-300 hover:text-white underline ml-auto cursor-pointer flex-shrink-0"
             >
               Change
             </button>
           )}
         </div>
       ) : selectedLocation ? (
-        <div className="mt-2 flex items-center justify-between text-xs text-emerald-400 bg-neutral-900 border border-neutral-800 px-3 py-1.5 rounded-lg w-fit gap-2">
-          <div className="flex items-center gap-1.5">
-            <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Filtered to: <strong className="text-white">{selectedLocation}</strong></span>
+        <div className="mt-2 flex items-center justify-between text-xs text-emerald-400 bg-neutral-900 border border-neutral-800 px-3 py-1.5 rounded-lg max-w-full w-fit gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <MapPin className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+            <span className="break-words">Filtered to: <strong className="text-white">{selectedLocation}</strong></span>
           </div>
           {onOpenLocationModal && (
             <button
               type="button"
               onClick={onOpenLocationModal}
-              className="text-[11px] font-bold text-neutral-400 hover:text-emerald-300 underline ml-2 cursor-pointer"
+              className="text-[11px] font-bold text-neutral-400 hover:text-emerald-300 underline ml-auto cursor-pointer flex-shrink-0"
             >
               Change
             </button>

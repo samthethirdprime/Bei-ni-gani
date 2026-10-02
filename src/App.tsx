@@ -520,7 +520,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
+    <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col font-['Plus_Jakarta_Sans',sans-serif] w-full max-w-full overflow-x-clip">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-emerald-500 text-neutral-950 px-4 py-2.5 rounded-full font-bold text-xs shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-3 max-w-[90vw] text-center">
@@ -545,7 +545,7 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-5 space-y-5">
+      <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-5 space-y-5 min-w-0">
         {/* Hero Banner / Tagline Box */}
         <div className="bg-gradient-to-br from-neutral-900 via-neutral-900 to-neutral-950 border border-neutral-800 rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden">
           <div className="relative z-10 space-y-2">
@@ -567,7 +567,7 @@ export default function App() {
         </div>
 
         {/* Large Search Box with Examples */}
-        <section>
+        <section className="w-full min-w-0">
           <SearchBar
             query={searchQuery}
             onChangeQuery={setSearchQuery}
@@ -582,7 +582,7 @@ export default function App() {
         </section>
 
         {/* Category Horizontal Pills */}
-        <section>
+        <section className="w-full max-w-full min-w-0">
           <CategoryFilter
             selectedCategory={selectedCategory}
             onSelectCategory={setSelectedCategory}
@@ -592,10 +592,10 @@ export default function App() {
         </section>
 
         {/* Active Filters / Results Header */}
-        <div className="flex items-center justify-between pt-1 text-xs text-neutral-400">
-          <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center justify-between pt-1 text-xs text-neutral-400 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
             {searchQuery ? (
-              <span>
+              <span className="break-words min-w-0">
                 Results for <strong className="text-white">"{searchQuery}"</strong> ({searchResults.length} {searchResults.length === 1 ? 'match' : 'matches'})
               </span>
             ) : selectedCategory !== 'all' ? (
@@ -708,7 +708,7 @@ export default function App() {
 
         {/* Broad Query Variant Filter Tabs */}
         {availableVariants.length > 0 && searchResults.length > 0 && (
-          <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-2.5 flex items-center gap-1.5 overflow-x-auto scrollbar-none text-xs">
+          <div className="w-full max-w-full min-w-0 bg-neutral-900/60 border border-neutral-800 rounded-2xl p-2.5 flex items-center gap-1.5 overflow-x-auto scrollbar-none text-xs">
             <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider pl-1.5 pr-1 flex items-center gap-1 flex-shrink-0">
               <Layers className="w-3.5 h-3.5 text-emerald-400" />
               <span>Variants:</span>

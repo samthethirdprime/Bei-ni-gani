@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Check, 
   MapPin, 
@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { Product } from '../types';
 import { formatPrice } from '../services/currencyService';
-import { isTrustworthyImageUrl } from '../services/imageUtils';
+import { getProductImageUrl } from '../services/imageUtils';
 
 interface ProductCardProps {
   product: Product;
@@ -30,9 +30,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onQuickConfirm,
   onOpenReportModal
 }) => {
+  const imageUrl = getProductImageUrl(product);
   const [imgError, setImgError] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [justConfirmed, setJustConfirmed] = useState(false);
+
+  // Reset imgError whenever product identity or image URL changes
+  useEffect(() => {
+    setImgError(false);
+  }, [product.id, imageUrl]);
 
   const handleConfirmClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -54,7 +60,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const formattedMin = formatPrice(product.minPrice, curr);
   const formattedMax = formatPrice(product.maxPrice, curr);
 
-  const hasValidImage = Boolean(product.image && isTrustworthyImageUrl(product.image) && !imgError);
+  const hasValidImage = Boolean(imageUrl && !imgError);
 
   return (
     <div 
@@ -68,8 +74,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-neutral-950 flex-shrink-0 border border-neutral-800 flex items-center justify-center">
             {hasValidImage ? (
               <img
-                src={product.image}
+                src={imageUrl!}
                 alt={product.name}
+                referrerPolicy="no-referrer"
                 onError={() => setImgError(true)}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 loading="lazy"
@@ -149,7 +156,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                   / {product.unit}
                 </span>
               </div>
-              <div className="text-xs text-neutral-400 flex items-center gap-1 mt-0.5">
+              <div className="text-xs text-neutral-400 flex items-center gap-1 mt-0.5 flex-wrap min-w-0">
                 <span className="text-neutral-500">Range:</span>
                 <span className="font-semibold text-neutral-300">
                   {formattedMin} – {formattedMax}

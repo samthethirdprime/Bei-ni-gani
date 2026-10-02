@@ -71,7 +71,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
         category,
         sizeOrQuantity: quantity.trim() || 'Standard',
         unit: unit.trim() || 'piece',
-        image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80',
+        image: undefined,
         typicalPrice: priceNum,
         minPrice: minEst,
         maxPrice: maxEst,

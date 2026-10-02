@@ -62,15 +62,100 @@ export interface SearchProvider {
   search(query: string, options?: SearchOptions): Promise<ProviderSearchResult>;
 }
 
-export function isTrustworthyImageUrl(url?: string | null): boolean {
-  if (!url || typeof url !== 'string') return false;
-  const trimmed = url.trim();
-  if (!trimmed.startsWith('https://') && !trimmed.startsWith('http://')) return false;
-  if (trimmed.includes('unsplash.com')) return false;
-  if (trimmed.includes('[') || trimmed.includes(']') || trimmed.includes('<') || trimmed.includes('>')) return false;
-  if (trimmed.includes('(') && trimmed.includes(')') && trimmed.includes('http')) return false;
-  if (trimmed.length > 500) return false;
-  return true;
+export function extractRawImageUrl(raw: unknown): string | null {
+  if (!raw) return null;
+
+  // Handle arrays: [url1, url2] or [{ url: ... }]
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      const extracted = extractRawImageUrl(item);
+      if (extracted) return extracted;
+    }
+    return null;
+  }
+
+  // Handle objects: { url: ... } or { src: ... } or { contentUrl: ... } or { image: ... } or { imageUrl: ... }
+  if (typeof raw === 'object' && raw !== null) {
+    const obj = raw as Record<string, unknown>;
+    const candidate =
+      obj.url ||
+      obj.src ||
+      obj.contentUrl ||
+      obj.imageUrl ||
+      obj.image ||
+      obj.photo ||
+      obj.secure_url ||
+      obj.thumbnail ||
+      obj.previewUrl ||
+      obj.original ||
+      obj.source;
+
+    if (candidate && candidate !== raw) {
+      return extractRawImageUrl(candidate);
+    }
+    return null;
+  }
+
+  if (typeof raw !== 'string') return null;
+
+  let str = raw.trim();
+  if (!str) return null;
+
+  // Unescape HTML entities like &amp; -> &
+  str = str.replace(/&amp;/g, '&');
+
+  // Strip wrapping quotes
+  if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
+    str = str.slice(1, -1).trim();
+  }
+
+  // Handle Markdown syntax: ![alt](url) or [alt](url) or [![alt](url)](link)
+  const mdMatch = str.match(/(?:!\[.*?\]|\[.*?\])\((https?:\/\/[^\s\)]+|\/\/[^\s\)]+)\)/i);
+  if (mdMatch) {
+    str = mdMatch[1];
+  } else {
+    // Handle raw wrapped parentheses: (https://...)
+    const parenMatch = str.match(/^\((https?:\/\/[^\s\)]+|\/\/[^\s\)]+)\)$/i);
+    if (parenMatch) {
+      str = parenMatch[1];
+    }
+  }
+
+  // Handle HTML img tag: <img src="url" ... />
+  const htmlImgMatch = str.match(/<img[^>]+(?:src|data-src)=["']([^"']+)["']/i);
+  if (htmlImgMatch) {
+    str = htmlImgMatch[1];
+  }
+
+  // Handle protocol-relative URL (e.g. //cdn.jumia.co.ke/...)
+  if (str.startsWith('//')) {
+    str = `https:${str}`;
+  }
+
+  // Reject generic Unsplash images or generic placeholders per instructions
+  if (str.includes('unsplash.com')) {
+    return null;
+  }
+
+  // Validate standard http/https
+  if (!str.startsWith('http://') && !str.startsWith('https://')) {
+    return null;
+  }
+
+  if (str.length > 1000) return null;
+
+  // Check URL validity
+  try {
+    const parsed = new URL(str);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+export function isTrustworthyImageUrl(url?: unknown): boolean {
+  return extractRawImageUrl(url) !== null;
 }
 
 export function formatSearchResponse(
@@ -96,7 +181,7 @@ export function formatSearchResponse(
     retrievedAt: i.retrievedAt || i.timestamp,
     acquisitionMethod: i.acquisitionMethod || (i.sourceType === 'official' ? 'official' : (i.sourceType === 'community' ? 'community' : 'search_snippet')),
     sourceType: i.sourceType,
-    image: isTrustworthyImageUrl(i.image) ? i.image : undefined
+    image: extractRawImageUrl(i.image || (i as any).imageUrl || (i as any).photoUrl || (i as any).src) || undefined
   }));
 
   if (result.hasLiveResults && normalizedItems.length > 0) {
@@ -122,7 +207,7 @@ export function formatSearchResponse(
       const minPrice = prices.length > 0 ? Math.min(...prices) : rep.price;
       const maxPrice = prices.length > 0 ? Math.max(...prices) : rep.price;
       const typicalPrice = prices.length > 0 ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : rep.price;
-      const validImageItem = items.find(i => isTrustworthyImageUrl(i.image));
+      const validImage = items.map(it => extractRawImageUrl(it.image || (it as any).imageUrl)).find(Boolean);
 
       return {
         id: `discovered-${clusterKey}-${pIdx}-${Date.now()}`,
@@ -131,7 +216,7 @@ export function formatSearchResponse(
         category: rep.category || category || 'general',
         sizeOrQuantity: rep.unit || '1 unit',
         unit: rep.unit || 'unit',
-        image: validImageItem?.image || undefined,
+        image: validImage || undefined,
         typicalPrice,
         minPrice,
         maxPrice,
@@ -162,6 +247,7 @@ export function formatSearchResponse(
             : (it.sourceType === 'official' ? 'OFFICIAL' : 'ONLINE_RETAILER'),
           acquisitionMethod: it.acquisitionMethod || (it.sourceType === 'official' ? 'official' : (it.sourceType === 'community' ? 'community' : 'search_snippet')),
           sourceUrl: it.sourceUrl || it.url,
+          image: extractRawImageUrl(it.image || (it as any).imageUrl) || undefined,
           dateCollected: it.retrievedAt || it.timestamp,
           inStock: true,
           notes: it.notes,

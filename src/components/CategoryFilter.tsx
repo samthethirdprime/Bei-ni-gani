@@ -73,7 +73,7 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
   }
 
   return (
-    <div className="w-full overflow-x-auto no-scrollbar py-2">
+    <div className="w-full max-w-full overflow-x-auto no-scrollbar py-2">
       <div className="flex items-center gap-2 min-w-max px-0.5">
         {allCategories.map((cat) => {
           const isSelected = selectedCategory === cat.key;

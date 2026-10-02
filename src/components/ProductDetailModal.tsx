@@ -24,7 +24,7 @@ import { fetchReportsForProduct } from '../services/firebaseService';
 import { PriceHistoryChart } from './PriceHistoryChart';
 import { VendorComparisonList } from './VendorComparisonList';
 import { formatPrice } from '../services/currencyService';
-import { isTrustworthyImageUrl } from '../services/imageUtils';
+import { getProductImageUrl } from '../services/imageUtils';
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -57,6 +57,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [copiedToastVisible, setCopiedToastVisible] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const imageUrl = getProductImageUrl(product);
 
   useEffect(() => {
     setImgError(false);
@@ -66,7 +67,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         .then(data => setReports(data))
         .finally(() => setLoadingReports(false));
     }
-  }, [product?.id, product?.reportsCount]);
+  }, [product?.id, product?.reportsCount, imageUrl]);
 
   if (!product) return null;
 
@@ -206,10 +207,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           {/* Main Visual & Info Header */}
           <div className="flex flex-col sm:flex-row gap-4 items-start">
             <div className="w-full sm:w-44 h-48 sm:h-44 rounded-2xl overflow-hidden bg-neutral-950 border border-neutral-800 flex-shrink-0 flex items-center justify-center">
-              {product.image && isTrustworthyImageUrl(product.image) && !imgError ? (
+              {imageUrl && !imgError ? (
                 <img
-                  src={product.image}
+                  src={imageUrl}
                   alt={product.name}
+                  referrerPolicy="no-referrer"
                   onError={() => setImgError(true)}
                   className="w-full h-full object-cover"
                 />
