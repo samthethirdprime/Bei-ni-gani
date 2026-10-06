@@ -72,6 +72,19 @@ export function extractRawImageUrl(raw: unknown): string | null {
     str = `https:${str}`;
   }
 
+  // If URL is an /api/image-proxy wrapper, unwrap back to the direct image URL
+  if (str.startsWith('/api/image-proxy?url=')) {
+    try {
+      const rawParam = str.replace('/api/image-proxy?url=', '');
+      const unwrapped = decodeURIComponent(rawParam);
+      if (unwrapped.startsWith('http://') || unwrapped.startsWith('https://')) {
+        str = unwrapped;
+      }
+    } catch {
+      // Keep str
+    }
+  }
+
   // Reject generic Unsplash images or generic placeholders per instructions
   if (str.includes('unsplash.com')) {
     return null;
@@ -100,13 +113,24 @@ export function isTrustworthyImageUrl(url?: unknown): boolean {
 
 export function getProductImageUrl(product?: { image?: any; imageUrl?: any; vendors?: any[] } | null): string | null {
   if (!product) return null;
-  const direct = extractRawImageUrl(product.image) || extractRawImageUrl((product as any).imageUrl);
+  const direct = extractRawImageUrl(
+    product.image || 
+    (product as any).imageUrl || 
+    (product as any).photoUrl || 
+    (product as any).thumbnail || 
+    (product as any).picture
+  );
   if (direct) return direct;
 
   // If top-level image was not set, search vendors for any verified vendor image
   if (Array.isArray(product.vendors)) {
     for (const v of product.vendors) {
-      const vImg = extractRawImageUrl(v?.image) || extractRawImageUrl(v?.imageUrl);
+      const vImg = extractRawImageUrl(
+        v?.image || 
+        v?.imageUrl || 
+        v?.thumbnail || 
+        v?.photoUrl
+      );
       if (vImg) return vImg;
     }
   }

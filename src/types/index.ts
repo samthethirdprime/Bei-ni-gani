@@ -40,6 +40,7 @@ export interface VendorPrice {
   sourceType: 'ONLINE_RETAILER' | 'PHYSICAL_STORE' | 'MARKET_STALL' | 'OFFICIAL' | 'COMMUNITY';
   acquisitionMethod?: AcquisitionMethod;
   sourceUrl?: string;
+  image?: string;
   dateCollected: string;
   inStock?: boolean;
   notes?: string;

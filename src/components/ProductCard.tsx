@@ -31,14 +31,23 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onOpenReportModal
 }) => {
   const imageUrl = getProductImageUrl(product);
-  const [imgError, setImgError] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [justConfirmed, setJustConfirmed] = useState(false);
 
-  // Reset imgError whenever product identity or image URL changes
+  console.log("IMAGE DEBUG PRODUCT", product);
+  console.log("IMAGE DEBUG URL", product?.image);
+  console.log("IMAGE DEBUG SRC", imageUrl);
+
+  // Reset image failure state when imageUrl changes
   useEffect(() => {
-    setImgError(false);
-  }, [product.id, imageUrl]);
+    setImageFailed(false);
+  }, [imageUrl]);
+
+  const handleImageError = () => {
+    console.log("IMAGE DEBUG ONERROR FIRED", product.name, imageUrl);
+    setImageFailed(true);
+  };
 
   const handleConfirmClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -60,8 +69,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const formattedMin = formatPrice(product.minPrice, curr);
   const formattedMax = formatPrice(product.maxPrice, curr);
 
-  const hasValidImage = Boolean(imageUrl && !imgError);
-
   return (
     <div 
       onClick={() => onSelect(product)}
@@ -71,15 +78,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         {/* Top Header: Image + Names + Price */}
         <div className="flex gap-3.5 items-start">
           {/* Image / Neutral Placeholder */}
-          <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-neutral-950 flex-shrink-0 border border-neutral-800 flex items-center justify-center">
-            {hasValidImage ? (
+          <div className="relative aspect-square w-24 h-24 sm:w-28 sm:h-28 min-h-24 sm:min-h-28 rounded-xl overflow-hidden bg-neutral-950 flex-shrink-0 border border-neutral-800 flex items-center justify-center">
+            {imageUrl && !imageFailed ? (
               <img
-                src={imageUrl!}
+                src={imageUrl}
                 alt={product.name}
-                referrerPolicy="no-referrer"
-                onError={() => setImgError(true)}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                loading="lazy"
+                loading="eager"
+                decoding="async"
+                onError={handleImageError}
+                className="w-full h-full object-cover block group-hover:scale-105 transition-transform duration-300"
               />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-neutral-900 to-neutral-950 text-neutral-500 p-2 text-center select-none">
@@ -166,8 +173,30 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </div>
         </div>
 
-        {/* Vendor & Source Row */}
-        {product.retailerOrSource && (
+        {/* Vendor & Source Row: Shows all available marketplaces directly on the initial result */}
+        {product.vendors && product.vendors.length > 0 ? (
+          <div className="mt-2.5 pt-2 border-t border-neutral-800/60 text-[11px] text-neutral-400">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] text-neutral-500 font-semibold uppercase tracking-wider flex items-center gap-1">
+                <Store className="w-3 h-3 text-amber-400" />
+                Available at:
+              </span>
+              {Array.from(new Set(product.vendors.map(v => v.vendorName))).slice(0, 4).map(vName => (
+                <span 
+                  key={vName}
+                  className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-neutral-800 text-neutral-200 border border-neutral-700/60 truncate max-w-[140px]"
+                >
+                  {vName}
+                </span>
+              ))}
+              {new Set(product.vendors.map(v => v.vendorName)).size > 4 && (
+                <span className="text-[10px] text-neutral-400 font-medium">
+                  +{new Set(product.vendors.map(v => v.vendorName)).size - 4} more
+                </span>
+              )}
+            </div>
+          </div>
+        ) : product.retailerOrSource ? (
           <div className="mt-2 text-[11px] text-neutral-400 flex items-center justify-between gap-2">
             <span className="truncate flex items-center gap-1.5 text-neutral-300">
               <Store className="w-3.5 h-3.5 text-neutral-500 flex-shrink-0" />
@@ -180,7 +209,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               </span>
             )}
           </div>
-        )}
+        ) : null}
 
         {/* Location & Metadata Bar */}
         <div className="mt-3 pt-2.5 border-t border-neutral-800/80 flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-400">

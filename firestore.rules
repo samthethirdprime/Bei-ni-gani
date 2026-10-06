@@ -2,11 +2,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Default deny catch-all
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
     // Helper functions
     function isValidId(id) {
       return id is string && id.size() > 0 && id.size() <= 128;
@@ -22,7 +17,7 @@ service cloud.firestore {
 
     // Products: readable by everyone in Kenya
     match /products/{productId} {
-      allow get, list: if isValidId(productId) || true;
+      allow get, list: if true;
 
       // Creation allows catalog seeding or community-added products
       allow create: if isValidId(productId)
@@ -43,7 +38,7 @@ service cloud.firestore {
           incoming().diff(existing()).affectedKeys().hasOnly(['confirmsCount', 'updatedAt']) ||
           incoming().diff(existing()).affectedKeys().hasOnly(['outdatesCount', 'updatedAt']) ||
           incoming().diff(existing()).affectedKeys().hasOnly(['flaggedCount', 'updatedAt']) ||
-          incoming().diff(existing()).affectedKeys().hasOnly(['vendors', 'typicalPrice', 'minPrice', 'maxPrice', 'updatedAt', 'retailerOrSource', 'dateCollected'])
+          incoming().diff(existing()).affectedKeys().hasOnly(['vendors', 'typicalPrice', 'minPrice', 'maxPrice', 'updatedAt', 'retailerOrSource', 'dateCollected', 'image'])
         );
       
       allow delete: if false;
@@ -87,9 +82,5 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Test connection doc
-    match /test/{testId} {
-      allow read: if true;
-    }
   }
 }

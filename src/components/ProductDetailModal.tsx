@@ -56,11 +56,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [isRefreshingVendors, setIsRefreshingVendors] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copiedToastVisible, setCopiedToastVisible] = useState(false);
-  const [imgError, setImgError] = useState(false);
   const imageUrl = getProductImageUrl(product);
+  const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
-    setImgError(false);
+    setImageFailed(false);
     if (product) {
       setLoadingReports(true);
       fetchReportsForProduct(product.id)
@@ -68,6 +68,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         .finally(() => setLoadingReports(false));
     }
   }, [product?.id, product?.reportsCount, imageUrl]);
+
+  const handleImageError = () => {
+    setImageFailed(true);
+  };
 
   if (!product) return null;
 
@@ -207,13 +211,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           {/* Main Visual & Info Header */}
           <div className="flex flex-col sm:flex-row gap-4 items-start">
             <div className="w-full sm:w-44 h-48 sm:h-44 rounded-2xl overflow-hidden bg-neutral-950 border border-neutral-800 flex-shrink-0 flex items-center justify-center">
-              {imageUrl && !imgError ? (
+              {imageUrl && !imageFailed ? (
                 <img
                   src={imageUrl}
                   alt={product.name}
-                  referrerPolicy="no-referrer"
-                  onError={() => setImgError(true)}
-                  className="w-full h-full object-cover"
+                  loading="eager"
+                  decoding="async"
+                  onError={handleImageError}
+                  className="w-full h-full object-cover block"
                 />
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-neutral-900 to-neutral-950 text-neutral-500 p-4 text-center select-none">

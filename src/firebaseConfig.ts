@@ -13,15 +13,16 @@ export interface AppFirebaseConfig {
   firestoreDatabaseId?: string;
 }
 
+const projectId = (import.meta.env.VITE_FIREBASE_PROJECT_ID as string) || defaultAppletConfig.projectId || 'bei-gani';
 const configuredDbId = (import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID as string) || 
   (defaultAppletConfig as any).firestoreDatabaseId || 
-  'ai-studio-55344e79-4dac-4650-9c91-1717a9196266';
+  '(default)';
 
 const firebaseConfig: AppFirebaseConfig = {
   apiKey: (import.meta.env.VITE_FIREBASE_API_KEY as string) || defaultAppletConfig.apiKey,
-  authDomain: (import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string) || defaultAppletConfig.authDomain,
-  projectId: (import.meta.env.VITE_FIREBASE_PROJECT_ID as string) || defaultAppletConfig.projectId,
-  storageBucket: (import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string) || defaultAppletConfig.storageBucket,
+  authDomain: (import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string) || `${projectId}.firebaseapp.com`,
+  projectId: projectId,
+  storageBucket: (import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string) || `${projectId}.firebasestorage.app`,
   messagingSenderId: (import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string) || defaultAppletConfig.messagingSenderId,
   appId: (import.meta.env.VITE_FIREBASE_APP_ID as string) || defaultAppletConfig.appId,
   firestoreDatabaseId: configuredDbId
@@ -29,7 +30,9 @@ const firebaseConfig: AppFirebaseConfig = {
 
 export const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
 
-export const db: Firestore = getFirestore(app, configuredDbId);
+export const db: Firestore = (!configuredDbId || configuredDbId === '(default)')
+  ? getFirestore(app)
+  : getFirestore(app, configuredDbId);
 export const auth: Auth = getAuth(app);
 
 // Google Workspace Scopes

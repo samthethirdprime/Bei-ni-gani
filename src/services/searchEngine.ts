@@ -119,7 +119,7 @@ export function cleanQuery(query: string): string {
   if (!query) return '';
   return query
     .toLowerCase()
-    .replace(/[?!,.:;()"]/g, ' ')
+    .replace(/[?!,.:;()"\-_/]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -1045,6 +1045,7 @@ export function convertGroupedToProduct(group: GroupedProductComparison, targetL
     location: l.location,
     sourceType: l.sourceCategory === 'COMMUNITY' ? 'COMMUNITY' : (l.sourceCategory === 'SUPERMARKET' ? 'PHYSICAL_STORE' : (l.sourceCategory === 'OFFICIAL_REGULATOR' ? 'OFFICIAL' : 'ONLINE_RETAILER')),
     sourceUrl: l.sourceUrl,
+    image: l.imageUrl,
     dateCollected: l.dateCollected,
     inStock: l.availability !== 'OUT_OF_STOCK',
     isDemo: l.isDemo,
@@ -1097,43 +1098,101 @@ export async function searchRealtimePrice(
   const analysis = analyzeSearchQuery(rawQuery);
   const targetLocation = county || analysis.detectedLocation;
 
-  // 1. Query server backend for live web discovery with search grounding (Primary real live source)
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 9500);
+  // 1. Query server backend for live web discovery and connected sources in parallel
+  const backendPromise = (async () => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 9500);
+      const baseUrl = typeof window !== 'undefined' ? '' : 'http://localhost:3000';
 
-    const res = await fetch('/api/search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: rawQuery, county: targetLocation, category }),
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
+      const res = await fetch(`${baseUrl}/api/search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: rawQuery, county: targetLocation, category }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
 
-    if (res.ok) {
-      const data = await res.json();
-      if (data.verified && (data.product || (data.products && data.products.length > 0))) {
-        return data;
+      if (res.ok) {
+        const data = await res.json();
+        if (data.verified && (data.product || (data.products && data.products.length > 0))) {
+          const prods: Product[] = data.products && data.products.length > 0
+            ? data.products
+            : (data.product ? [data.product] : []);
+          return { products: prods, sources: data.sources || [] };
+        }
+      }
+    } catch (err: any) {
+      console.warn('[SearchEngine] Backend live discovery search note:', err?.message || err);
+    }
+    return { products: [] as Product[], sources: [] as string[] };
+  })();
+
+  const connectorPromise = (async () => {
+    try {
+      const connectorResult = await connectorRegistry.searchAll(analysis, targetLocation, category, demoMode);
+      if (connectorResult.groupedResults.allGroups && connectorResult.groupedResults.allGroups.length > 0) {
+        const unifiedProducts = connectorResult.groupedResults.allGroups.map(g => convertGroupedToProduct(g, targetLocation));
+        return { products: unifiedProducts, sources: connectorResult.queriedSources };
+      }
+    } catch (connectorErr) {
+      console.warn('[SearchEngine] Connector search note:', connectorErr);
+    }
+    return { products: [] as Product[], sources: [] as string[] };
+  })();
+
+  const [backendSettled, connectorSettled] = await Promise.allSettled([backendPromise, connectorPromise]);
+  const backendRes = backendSettled.status === 'fulfilled' ? backendSettled.value : { products: [] as Product[], sources: [] as string[] };
+  const connectorRes = connectorSettled.status === 'fulfilled' ? connectorSettled.value : { products: [] as Product[], sources: [] as string[] };
+
+  const allSources = Array.from(new Set([...backendRes.sources, ...connectorRes.sources]));
+
+  // Combine products: if a product exists across multiple sources/marketplaces, merge vendors so all appear on initial result
+  const combinedMap = new Map<string, Product>();
+
+  for (const p of [...backendRes.products, ...connectorRes.products]) {
+    const key = p.name.toLowerCase().replace(/[^a-z0-9]/g, ' ').trim().split(/\s+/).slice(0, 3).join('-');
+    if (!combinedMap.has(key)) {
+      combinedMap.set(key, { ...p });
+    } else {
+      const existing = combinedMap.get(key)!;
+      // Merge vendors
+      const mergedVendors = [...(existing.vendors || []), ...(p.vendors || [])];
+      const uniqueVendors = mergedVendors.filter((v, idx, arr) =>
+        arr.findIndex(other => other.vendorName === v.vendorName && other.price === v.price) === idx
+      );
+      existing.vendors = uniqueVendors;
+      existing.retailerOrSource = Array.from(new Set(uniqueVendors.map(v => v.vendorName))).slice(0, 4).join(', ');
+      // If existing had no image but incoming has image, use incoming image
+      if (!existing.image && p.image) {
+        existing.image = p.image;
+      }
+      const prices = uniqueVendors.map(v => v.price).filter(pr => pr > 0);
+      if (prices.length > 0) {
+        existing.minPrice = Math.min(...prices);
+        existing.maxPrice = Math.max(...prices);
+        existing.typicalPrice = Math.round(prices.reduce((a, b) => a + b, 0) / prices.length);
       }
     }
-  } catch (err: any) {
-    console.warn('[SearchEngine] Backend live discovery search note:', err?.message || err);
   }
 
-  // 2. Search connected Kenyan sources (Firestore Community Reports, EPRA official caps, and demo connectors if demoMode=true)
-  try {
-    const connectorResult = await connectorRegistry.searchAll(analysis, targetLocation, category, demoMode);
-    if (connectorResult.groupedResults.allGroups && connectorResult.groupedResults.allGroups.length > 0) {
-      const unifiedProducts = connectorResult.groupedResults.allGroups.map(g => convertGroupedToProduct(g, targetLocation));
-      return {
-        verified: unifiedProducts.some(p => !p.isDemo),
-        product: unifiedProducts[0] || null,
-        products: unifiedProducts,
-        sources: connectorResult.queriedSources
-      };
-    }
-  } catch (connectorErr) {
-    console.warn('[SearchEngine] Connector search note:', connectorErr);
+  const mergedProducts = Array.from(combinedMap.values());
+
+  if (mergedProducts.length > 0) {
+    // Prioritize products with verified images
+    mergedProducts.sort((a, b) => {
+      const aImg = a.image ? 1 : 0;
+      const bImg = b.image ? 1 : 0;
+      if (aImg !== bImg) return bImg - aImg;
+      return a.typicalPrice - b.typicalPrice;
+    });
+
+    return {
+      verified: mergedProducts.some(p => !p.isDemo),
+      product: mergedProducts[0],
+      products: mergedProducts,
+      sources: allSources
+    };
   }
 
   // 3. If no verified live price found across connected sources

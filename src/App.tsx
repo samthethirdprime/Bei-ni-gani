@@ -423,6 +423,7 @@ export default function App() {
       if (result.verified && result.product && result.product.vendors && result.product.vendors.length > 0) {
         const updatedProduct: Product = {
           ...product,
+          image: result.product.image || product.image,
           vendors: result.product.vendors,
           minPrice: result.product.minPrice,
           maxPrice: result.product.maxPrice,

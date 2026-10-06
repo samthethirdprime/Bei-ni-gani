@@ -137,6 +137,11 @@ export function extractRawImageUrl(raw: unknown): string | null {
     return null;
   }
 
+  // Handle local proxy URLs e.g. /api/image-proxy?url=...
+  if (str.startsWith('/api/image-proxy')) {
+    return str;
+  }
+
   // Validate standard http/https
   if (!str.startsWith('http://') && !str.startsWith('https://')) {
     return null;
@@ -202,12 +207,13 @@ export function formatSearchResponse(
 
     const products = Array.from(clusters.entries()).map(([clusterKey, items], pIdx) => {
       items.sort((a, b) => a.price - b.price);
-      const rep = items[0];
+      const validImage = items.map(it => extractRawImageUrl(it.image || (it as any).imageUrl)).find(Boolean);
+      // Prefer representative item that has a valid image and title
+      const rep = items.find(it => extractRawImageUrl(it.image || (it as any).imageUrl)) || items[0];
       const prices = items.map(i => i.price).filter(p => p > 0);
       const minPrice = prices.length > 0 ? Math.min(...prices) : rep.price;
       const maxPrice = prices.length > 0 ? Math.max(...prices) : rep.price;
       const typicalPrice = prices.length > 0 ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : rep.price;
-      const validImage = items.map(it => extractRawImageUrl(it.image || (it as any).imageUrl)).find(Boolean);
 
       return {
         id: `discovered-${clusterKey}-${pIdx}-${Date.now()}`,
@@ -256,6 +262,14 @@ export function formatSearchResponse(
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
+    });
+
+    // Prioritize products with verified images over text-only blog snippets
+    products.sort((a, b) => {
+      const aImg = a.image ? 1 : 0;
+      const bImg = b.image ? 1 : 0;
+      if (aImg !== bImg) return bImg - aImg;
+      return a.typicalPrice - b.typicalPrice;
     });
 
     return {

@@ -124,17 +124,25 @@ export class SearchAggregator {
       }
     }
 
-    // Deduplicate items with same vendor and price
-    const seen = new Set<string>();
-    const deduplicated: NormalizedPriceResult[] = [];
+    // Deduplicate items with same vendor and price, preserving valid images
+    const seen = new Map<string, NormalizedPriceResult>();
 
     for (const item of allItems) {
       const key = `${item.vendor.toLowerCase()}-${item.price}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        deduplicated.push(item);
+      const existing = seen.get(key);
+      if (!existing) {
+        seen.set(key, { ...item });
+      } else {
+        if (!existing.image && item.image) {
+          existing.image = item.image;
+        }
+        if (!existing.url && item.url) {
+          existing.url = item.url;
+        }
       }
     }
+
+    const deduplicated = Array.from(seen.values());
 
     // Sort items with lowest price first
     deduplicated.sort((a, b) => a.price - b.price);

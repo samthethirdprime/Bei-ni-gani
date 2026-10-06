@@ -12,7 +12,8 @@ try {
     const raw = fs.readFileSync(configPath, 'utf-8');
     const firebaseConfig = JSON.parse(raw);
     const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-    db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+    const dbId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || firebaseConfig.firestoreDatabaseId;
+    db = (!dbId || dbId === '(default)') ? getFirestore(app) : getFirestore(app, dbId);
   }
 } catch (e) {
   console.warn('[CommunityProvider] Firebase init warning:', e);

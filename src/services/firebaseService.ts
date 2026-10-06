@@ -139,10 +139,14 @@ export async function confirmPrice(productId: string): Promise<void> {
   const path = `${PRODUCTS_COLLECTION}/${productId}`;
   try {
     const productRef = doc(db, PRODUCTS_COLLECTION, productId);
-    await updateDoc(productRef, {
-      confirmsCount: increment(1),
-      updatedAt: new Date().toISOString()
-    });
+    try {
+      await updateDoc(productRef, {
+        confirmsCount: increment(1),
+        updatedAt: new Date().toISOString()
+      });
+    } catch (e) {
+      console.warn('Product doc update skipped (item may be catalog-only):', e);
+    }
 
     // Record feedback event
     await addDoc(collection(db, FEEDBACK_COLLECTION), {
@@ -160,10 +164,14 @@ export async function markPriceOutdated(productId: string, suggestedPrice?: numb
   const path = `${PRODUCTS_COLLECTION}/${productId}`;
   try {
     const productRef = doc(db, PRODUCTS_COLLECTION, productId);
-    await updateDoc(productRef, {
-      outdatesCount: increment(1),
-      updatedAt: new Date().toISOString()
-    });
+    try {
+      await updateDoc(productRef, {
+        outdatesCount: increment(1),
+        updatedAt: new Date().toISOString()
+      });
+    } catch (e) {
+      console.warn('Product doc update skipped (item may be catalog-only):', e);
+    }
 
     await addDoc(collection(db, FEEDBACK_COLLECTION), {
       productId,
@@ -181,10 +189,14 @@ export async function reportPriceIssue(productId: string, reason: string): Promi
   const path = `${PRODUCTS_COLLECTION}/${productId}`;
   try {
     const productRef = doc(db, PRODUCTS_COLLECTION, productId);
-    await updateDoc(productRef, {
-      flaggedCount: increment(1),
-      updatedAt: new Date().toISOString()
-    });
+    try {
+      await updateDoc(productRef, {
+        flaggedCount: increment(1),
+        updatedAt: new Date().toISOString()
+      });
+    } catch (e) {
+      console.warn('Product doc update skipped (item may be catalog-only):', e);
+    }
 
     await addDoc(collection(db, FEEDBACK_COLLECTION), {
       productId,
@@ -213,11 +225,15 @@ export async function submitPaidReport(
     await setDoc(doc(db, REPORTS_COLLECTION, newId), fullReport);
 
     // Update product stats
-    const productRef = doc(db, PRODUCTS_COLLECTION, report.productId);
-    await updateDoc(productRef, {
-      reportsCount: increment(1),
-      updatedAt: new Date().toISOString()
-    });
+    try {
+      const productRef = doc(db, PRODUCTS_COLLECTION, report.productId);
+      await updateDoc(productRef, {
+        reportsCount: increment(1),
+        updatedAt: new Date().toISOString()
+      });
+    } catch (e) {
+      console.warn('Product doc update skipped (item may be catalog-only):', e);
+    }
 
     return fullReport;
   } catch (error) {
