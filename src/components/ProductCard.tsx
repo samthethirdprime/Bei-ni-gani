@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { Product } from '../types';
 import { formatPrice } from '../services/currencyService';
-import { getProductImageUrl } from '../services/imageUtils';
+import { getProductImageUrl, getGenericProductImage, isFallbackProductImage, discoverProductImageAsync } from '../services/imageUtils';
 
 interface ProductCardProps {
   product: Product;
@@ -31,22 +31,61 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onOpenReportModal
 }) => {
   const imageUrl = getProductImageUrl(product);
+  const [currentImgSrc, setCurrentImgSrc] = useState<string | null>(imageUrl);
   const [imageFailed, setImageFailed] = useState(false);
+  const [hasTriedProxy, setHasTriedProxy] = useState(false);
+  const [imgSource, setImgSource] = useState<'retailer' | 'fallback' | 'discovered' | 'generic' | null>(
+    imageUrl ? (isFallbackProductImage(imageUrl) ? 'fallback' : (product.imageSource || 'retailer')) : null
+  );
   const [isConfirming, setIsConfirming] = useState(false);
   const [justConfirmed, setJustConfirmed] = useState(false);
 
-  console.log("IMAGE DEBUG PRODUCT", product);
-  console.log("IMAGE DEBUG URL", product?.image);
-  console.log("IMAGE DEBUG SRC", imageUrl);
-
-  // Reset image failure state when imageUrl changes
+  // Sync image source when imageUrl changes, and trigger async discovery only if no image exists
   useEffect(() => {
+    setCurrentImgSrc(imageUrl);
     setImageFailed(false);
-  }, [imageUrl]);
+    setHasTriedProxy(false);
+    setImgSource(imageUrl ? (isFallbackProductImage(imageUrl) ? 'fallback' : (product.imageSource || 'retailer')) : null);
+
+    // Dynamic discovery: ONLY run if no retailer image and no local photographic fallback
+    if (!imageUrl && product?.name) {
+      let isCancelled = false;
+      discoverProductImageAsync({
+        name: product.name,
+        category: product.category,
+        brand: product.brand,
+        sizeOrQuantity: product.sizeOrQuantity,
+        subcategory: product.subcategory
+      }).then(discoveredUrl => {
+        if (!isCancelled && discoveredUrl) {
+          setCurrentImgSrc(discoveredUrl);
+          setImgSource('discovered');
+          setImageFailed(false);
+        }
+      });
+      return () => {
+        isCancelled = true;
+      };
+    }
+  }, [imageUrl, product?.id, product?.name, product?.brand, product?.sizeOrQuantity, product?.category]);
 
   const handleImageError = () => {
-    console.log("IMAGE DEBUG ONERROR FIRED", product.name, imageUrl);
-    setImageFailed(true);
+    // If direct external image failed, automatically fall back to local image proxy
+    if (!hasTriedProxy && currentImgSrc && (currentImgSrc.startsWith('http://') || currentImgSrc.startsWith('https://')) && !currentImgSrc.startsWith('/api/image-proxy')) {
+      setHasTriedProxy(true);
+      setCurrentImgSrc(`/api/image-proxy?url=${encodeURIComponent(currentImgSrc)}`);
+    } else if (currentImgSrc && !isFallbackProductImage(currentImgSrc) && imgSource !== 'discovered') {
+      // If genuine retailer image couldn't load, fallback to real matching product photograph
+      const fallback = getGenericProductImage(product);
+      if (fallback) {
+        setCurrentImgSrc(fallback);
+        setImgSource('fallback');
+      } else {
+        setImageFailed(true);
+      }
+    } else {
+      setImageFailed(true);
+    }
   };
 
   const handleConfirmClick = async (e: React.MouseEvent) => {
@@ -79,12 +118,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <div className="flex gap-3.5 items-start">
           {/* Image / Neutral Placeholder */}
           <div className="relative aspect-square w-24 h-24 sm:w-28 sm:h-28 min-h-24 sm:min-h-28 rounded-xl overflow-hidden bg-neutral-950 flex-shrink-0 border border-neutral-800 flex items-center justify-center">
-            {imageUrl && !imageFailed ? (
+            {currentImgSrc && !imageFailed ? (
               <img
-                src={imageUrl}
+                src={currentImgSrc}
                 alt={product.name}
                 loading="eager"
                 decoding="async"
+                referrerPolicy="no-referrer"
                 onError={handleImageError}
                 className="w-full h-full object-cover block group-hover:scale-105 transition-transform duration-300"
               />

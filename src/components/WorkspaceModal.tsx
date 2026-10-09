@@ -3,7 +3,7 @@ import { X, Calendar, FileText, CheckCircle2, AlertCircle, Loader2, ArrowUpRight
 import { Product } from '../types';
 import { savePriceComparisonToDrive, scheduleCalendarEvent } from '../services/workspaceService';
 import { getAccessToken, googleSignIn } from '../firebaseConfig';
-import { getProductImageUrl } from '../services/imageUtils';
+import { getProductImageUrl, isGenericProductImage } from '../services/imageUtils';
 
 interface WorkspaceModalProps {
   isOpen: boolean;
@@ -194,18 +194,21 @@ https://beigani.co.ke
 
           {/* Target Product Summary */}
           <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200/80">
-            {getProductImageUrl(product) ? (
-              <img
-                src={getProductImageUrl(product)!}
-                alt={product.name}
-                referrerPolicy="no-referrer"
-                className="w-14 h-14 object-cover rounded-lg bg-gray-100 border border-gray-200 shrink-0"
-              />
-            ) : (
-              <div className="w-14 h-14 flex items-center justify-center rounded-lg bg-gray-200 border border-gray-300 text-gray-500 shrink-0">
-                <Package className="w-6 h-6 text-gray-500" />
-              </div>
-            )}
+            {(() => {
+              const imgUrl = getProductImageUrl(product);
+              return imgUrl ? (
+                <img
+                  src={imgUrl}
+                  alt={product.name}
+                  referrerPolicy="no-referrer"
+                  className="w-14 h-14 object-cover rounded-lg bg-gray-100 border border-gray-200 shrink-0"
+                />
+              ) : (
+                <div className="w-14 h-14 flex items-center justify-center rounded-lg bg-gray-200 border border-gray-300 text-gray-500 shrink-0">
+                  <Package className="w-6 h-6 text-gray-500" />
+                </div>
+              );
+            })()}
             <div className="min-w-0">
               <h4 className="font-bold text-gray-900 text-sm truncate">{product.name}</h4>
               <p className="text-xs text-emerald-700 font-semibold mt-0.5">

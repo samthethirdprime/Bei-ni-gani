@@ -3,6 +3,7 @@ import path from 'path';
 import dotenv from 'dotenv';
 import { searchAggregator } from './server/providers/searchAggregator';
 import { formatSearchResponse } from './server/providers/types';
+import { discoverProductPhotograph } from './server/services/imageDiscoveryService';
 
 dotenv.config();
 
@@ -12,6 +13,8 @@ const isProd = process.env.NODE_ENV === 'production';
 const rootDir = process.cwd();
 
 app.use(express.json());
+app.use('/product-photos', express.static(path.resolve(rootDir, 'public/product-photos')));
+app.use('/generic-images', express.static(path.resolve(rootDir, 'public/generic-images')));
 
 // In-memory cache for search queries to prevent duplicate requests
 const searchCache = new Map<string, { timestamp: number; data: any }>();
@@ -71,6 +74,54 @@ const handleSearchRequest = async (req: express.Request, res: express.Response) 
 app.post('/api/search', handleSearchRequest);
 app.get('/api/search', handleSearchRequest);
 
+// Dedicated Dynamic Product Image Discovery Endpoint
+app.get('/api/image-fallback', async (req, res) => {
+  const name = typeof req.query.name === 'string' ? req.query.name : '';
+  const category = typeof req.query.category === 'string' ? req.query.category : undefined;
+  const brand = typeof req.query.brand === 'string' ? req.query.brand : undefined;
+  const size = typeof req.query.size === 'string' ? req.query.size : undefined;
+  const type = typeof req.query.type === 'string' ? req.query.type : undefined;
+
+  if (!name.trim()) {
+    return res.status(400).json({ error: 'Product name is required' });
+  }
+
+  try {
+    const discovered = await discoverProductPhotograph({
+      name: name.trim(),
+      category,
+      brand,
+      size,
+      type
+    });
+
+    if (discovered && discovered.imageUrl) {
+      return res.json({
+        name,
+        imageUrl: discovered.imageUrl,
+        thumbnailUrl: discovered.thumbnailUrl,
+        imageSource: 'discovered',
+        title: discovered.title,
+        source: discovered.source,
+        pageUrl: discovered.pageUrl
+      });
+    }
+
+    return res.json({
+      name,
+      imageUrl: null,
+      imageSource: null
+    });
+  } catch (error: any) {
+    console.error('[BEI GANI] Error in dynamic image discovery:', error);
+    return res.json({
+      name,
+      imageUrl: null,
+      imageSource: null
+    });
+  }
+});
+
 // Secure Image Proxy to bypass hotlink / iframe Referer blocks on verified product media
 app.get('/api/image-proxy', async (req, res) => {
   const targetUrl = req.query.url;
@@ -89,7 +140,7 @@ app.get('/api/image-proxy', async (req, res) => {
 
     const imageRes = await fetch(targetUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:124.0) Gecko/20100101 Firefox/124.0',
         'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
       },
       signal: controller.signal

@@ -268,7 +268,47 @@ export const CANONICAL_CONCEPTS: ConceptMapping[] = [
     subcategory: 'Mobile Accessories',
     swahiliName: 'Chaja ya Simu',
     unit: 'piece',
-    aliases: ['phone charger', 'charger', 'usb cable', 'type c cable', 'lightning cable', 'fast charger', 'chaja', 'chaja ya simu', 'power bank']
+    aliases: ['phone charger', 'charger', 'usb cable', 'type c cable', 'lightning cable', 'fast charger', 'chaja', 'chaja ya simu']
+  },
+  {
+    canonicalName: 'Power Bank (Portable Battery Charger)',
+    category: 'electronics',
+    subcategory: 'Mobile Accessories & Power',
+    swahiliName: 'Power Bank / Chaja ya Kubeba',
+    unit: 'piece',
+    aliases: ['power bank', 'powerbank', 'portable charger', 'battery pack', 'portable power bank', 'power banks']
+  },
+  {
+    canonicalName: 'Headphones & Wireless Audio',
+    category: 'electronics',
+    subcategory: 'Audio & Headphones',
+    swahiliName: 'Headphones / Vifaa vya Masikio',
+    unit: 'pair / piece',
+    aliases: ['headphones', 'headphone', 'headset', 'earphones', 'earbuds', 'wireless headphones', 'airpods']
+  },
+  {
+    canonicalName: 'TV Stand & Media Consoles',
+    category: 'furniture',
+    subcategory: 'Living Room & TV Units',
+    swahiliName: 'Meza ya TV / Stand ya TV',
+    unit: 'piece',
+    aliases: ['tv stand', 'tvstand', 'tv unit', 'television stand', 'tv console', 'entertainment unit', 'tv cabinet']
+  },
+  {
+    canonicalName: 'Duvet & Bedding Comforters',
+    category: 'household',
+    subcategory: 'Bedding & Linens',
+    swahiliName: 'Duvet ya Kitanda / Blanketi',
+    unit: 'piece',
+    aliases: ['duvet', 'duvets', 'comforter', 'comforters', 'quilt', 'quilts', 'all seasons duvet', 'microfiber duvet']
+  },
+  {
+    canonicalName: 'Adult Wellness & Personal Massagers (Dildos)',
+    category: 'personal_care',
+    subcategory: 'Adult Wellness',
+    swahiliName: 'Vifaa vya Afya ya Kibinafsi (Adult Wellness)',
+    unit: 'piece',
+    aliases: ['dildo', 'dildos', 'personal massager', 'vibrator', 'adult toy', 'adult wellness', 'silicone massager', 'sex toy']
   },
   // GROCERIES & COMMODITIES
   {
@@ -446,6 +486,62 @@ export const BASE_PRODUCTS: BaseProductDef[] = [
     category: 'groceries',
     subcategory: 'Fruits & Vegetables',
     aliases: ['watermelon', 'water melon', 'tikiti', 'tikitimaji', 'tikiti maji'],
+    variants: []
+  },
+  {
+    key: 'power_bank',
+    name: 'Power Bank (Portable Charger)',
+    category: 'electronics',
+    subcategory: 'Mobile Accessories & Power',
+    aliases: ['power bank', 'powerbank', 'portable charger', 'battery pack', 'portable power bank'],
+    variants: []
+  },
+  {
+    key: 'tv_stand',
+    name: 'TV Stand & Media Consoles',
+    category: 'furniture',
+    subcategory: 'Living Room & TV Units',
+    aliases: ['tv stand', 'tvstand', 'tv unit', 'television stand', 'tv console', 'entertainment unit', 'tv cabinet'],
+    variants: []
+  },
+  {
+    key: 'headphones',
+    name: 'Headphones & Wireless Audio',
+    category: 'electronics',
+    subcategory: 'Audio & Headphones',
+    aliases: ['headphones', 'headphone', 'headset', 'earphones', 'earbuds', 'wireless headphones', 'airpods'],
+    variants: []
+  },
+  {
+    key: 'duvet',
+    name: 'Duvet & Bedding Comforters',
+    category: 'household',
+    subcategory: 'Bedding & Linens',
+    aliases: ['duvet', 'duvets', 'comforter', 'comforters', 'quilt', 'quilts', 'all seasons duvet', 'microfiber duvet'],
+    variants: []
+  },
+  {
+    key: 'shoe_rack',
+    name: 'Shoe Rack & Organizers',
+    category: 'furniture',
+    subcategory: 'Storage & Organizers',
+    aliases: ['shoe rack', 'shoerack', 'shoe stand', 'shoe organizer', 'shoe cabinet', 'rack ya viatu'],
+    variants: []
+  },
+  {
+    key: 'socks',
+    name: 'Socks & Hosiery',
+    category: 'clothing',
+    subcategory: 'Hosiery & Socks',
+    aliases: ['socks', 'sock', 'soksi', 'stockings', 'ankle socks', 'cotton socks', 'crew socks'],
+    variants: []
+  },
+  {
+    key: 'dildo',
+    name: 'Adult Wellness & Personal Massagers (Dildos)',
+    category: 'personal_care',
+    subcategory: 'Adult Wellness',
+    aliases: ['dildo', 'dildos', 'personal massager', 'vibrator', 'adult toy', 'adult wellness', 'silicone massager', 'sex toy'],
     variants: []
   },
   {
@@ -1046,6 +1142,7 @@ export function convertGroupedToProduct(group: GroupedProductComparison, targetL
     sourceType: l.sourceCategory === 'COMMUNITY' ? 'COMMUNITY' : (l.sourceCategory === 'SUPERMARKET' ? 'PHYSICAL_STORE' : (l.sourceCategory === 'OFFICIAL_REGULATOR' ? 'OFFICIAL' : 'ONLINE_RETAILER')),
     sourceUrl: l.sourceUrl,
     image: l.imageUrl,
+    imageSource: l.imageSource || (l.imageUrl ? 'retailer' : 'fallback'),
     dateCollected: l.dateCollected,
     inStock: l.availability !== 'OUT_OF_STOCK',
     isDemo: l.isDemo,
@@ -1062,6 +1159,7 @@ export function convertGroupedToProduct(group: GroupedProductComparison, targetL
     sizeOrQuantity: group.variant || 'Standard',
     unit: group.variant || 'unit',
     image: group.image,
+    imageSource: group.imageSource || (group.image ? 'retailer' : 'fallback'),
     typicalPrice: group.typicalPrice,
     minPrice: group.lowestPrice,
     maxPrice: group.highestPrice,
@@ -1163,10 +1261,6 @@ export async function searchRealtimePrice(
       );
       existing.vendors = uniqueVendors;
       existing.retailerOrSource = Array.from(new Set(uniqueVendors.map(v => v.vendorName))).slice(0, 4).join(', ');
-      // If existing had no image but incoming has image, use incoming image
-      if (!existing.image && p.image) {
-        existing.image = p.image;
-      }
       const prices = uniqueVendors.map(v => v.price).filter(pr => pr > 0);
       if (prices.length > 0) {
         existing.minPrice = Math.min(...prices);
@@ -1187,12 +1281,19 @@ export async function searchRealtimePrice(
       return a.typicalPrice - b.typicalPrice;
     });
 
-    return {
-      verified: mergedProducts.some(p => !p.isDemo),
-      product: mergedProducts[0],
-      products: mergedProducts,
-      sources: allSources
-    };
+    // Filter out demo/fake product listings from normal production search results
+    const filteredProducts = demoMode
+      ? mergedProducts
+      : mergedProducts.filter(p => !p.isDemo && !p.name.includes('[DEMO DATA]') && !(p.retailerOrSource && p.retailerOrSource.includes('[DEMO DATA]')));
+
+    if (filteredProducts.length > 0) {
+      return {
+        verified: filteredProducts.some(p => !p.isDemo),
+        product: filteredProducts[0],
+        products: filteredProducts,
+        sources: allSources
+      };
+    }
   }
 
   // 3. If no verified live price found across connected sources

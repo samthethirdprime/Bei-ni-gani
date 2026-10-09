@@ -103,7 +103,8 @@ async function fetchProductPageDetails(url: string): Promise<{ name?: string; pr
 
     const res = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15'
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:124.0) Gecko/20100101 Firefox/124.0',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
       },
       signal: controller.signal
     });
@@ -116,19 +117,22 @@ async function fetchProductPageDetails(url: string): Promise<{ name?: string; pr
     let extractedPrice: number | undefined;
     let extractedImage: string | undefined;
 
-    // 1. Schema.org JSON-LD
+    // 1. Schema.org JSON-LD (supports both single objects and @graph arrays)
     const jsonLdMatch = html.match(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/);
     if (jsonLdMatch) {
       try {
-        const data = JSON.parse(jsonLdMatch[1]);
-        if (data && (data['@type'] === 'Product' || data.name)) {
-          extractedName = data.name;
-          const rawPrice = data.offers?.price || data.offers?.[0]?.price;
-          const numPrice = typeof rawPrice === 'string' ? parseFloat(rawPrice.replace(/,/g, '')) : (typeof rawPrice === 'number' ? rawPrice : undefined);
-          if (numPrice && numPrice > 0) extractedPrice = Math.round(numPrice);
+        const rawJson = JSON.parse(jsonLdMatch[1]);
+        const dataItems = Array.isArray(rawJson?.['@graph']) ? rawJson['@graph'] : [rawJson];
+        for (const data of dataItems) {
+          if (data && (data['@type'] === 'Product' || data.name)) {
+            if (!extractedName && data.name) extractedName = data.name;
+            const rawPrice = data.offers?.price || data.offers?.[0]?.price;
+            const numPrice = typeof rawPrice === 'string' ? parseFloat(rawPrice.replace(/,/g, '')) : (typeof rawPrice === 'number' ? rawPrice : undefined);
+            if (!extractedPrice && numPrice && numPrice > 0) extractedPrice = Math.round(numPrice);
 
-          const rawImg = typeof data.image === 'string' ? data.image : (Array.isArray(data.image) ? data.image[0] : (data.image?.url || undefined));
-          if (isTrustworthyImageUrl(rawImg)) extractedImage = rawImg;
+            const rawImg = typeof data.image === 'string' ? data.image : (Array.isArray(data.image) ? data.image[0] : (data.image?.url || undefined));
+            if (!extractedImage && isTrustworthyImageUrl(rawImg)) extractedImage = rawImg;
+          }
         }
       } catch (e) {
         // ignore parse error
@@ -178,7 +182,7 @@ async function fetchProductPageDetails(url: string): Promise<{ name?: string; pr
 export async function searchKenyanSpecialistRetailers(cleanQ: string, targetLoc: string): Promise<NormalizedPriceResult[]> {
   const results: NormalizedPriceResult[] = [];
   const qLower = cleanQ.toLowerCase();
-  const isTechOrElectronic = /\b(powerbank|power bank|phone|samsung|charger|anker|earbuds|headphones|laptop|cable|screen|case|adapter|tablet|ipad|iphone|oppo|xiaomi|redmi|tecno|infinix|oraimo|gadget|watch|audio)\b/i.test(qLower);
+  const isTechOrElectronic = /\b(powerbank|power bank|phone|samsung|charger|anker|earbuds|headphones|laptop|cable|screen|case|adapter|tablet|ipad|iphone|oppo|xiaomi|redmi|tecno|infinix|oraimo|gadget|watch|audio|tv|stand|appliance|mount)\b/i.test(qLower);
 
   if (!isTechOrElectronic) return results;
 
@@ -191,7 +195,7 @@ export async function searchKenyanSpecialistRetailers(cleanQ: string, targetLoc:
       const res = await fetch(`https://www.phoneplacekenya.com/wp-json/wp/v2/media?search=${encodeURIComponent(cleanQ)}&per_page=3`, {
         headers: {
           'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+          'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:124.0) Gecko/20100101 Firefox/124.0'
         },
         signal: controller.signal
       });
@@ -491,12 +495,13 @@ export class WebSearchProvider implements SearchProvider {
           }
         }
 
-        // Also check if link is a direct retailer product page to extract verified product image & structured data
+        // Also queue link for direct page inspection to extract verified product image & structured data
         if (
-          (cleanLink.includes('carrefour.ke') && cleanLink.includes('/p/')) ||
-          (cleanLink.includes('phoneplacekenya.com/product/')) ||
-          (cleanLink.includes('avechi.co.ke/product/')) ||
-          (cleanLink.includes('gadgetworld.co.ke/product/'))
+          !pagesToInspect.some(p => p.url === cleanLink) &&
+          pagesToInspect.length < 4 &&
+          (cleanLink.startsWith('http://') || cleanLink.startsWith('https://')) &&
+          !cleanLink.includes('google.') &&
+          !cleanLink.includes('duckduckgo.')
         ) {
           pagesToInspect.push({ url: cleanLink, vendorName: vendorInfo.name, snippetTitle: titleText });
         }
@@ -504,7 +509,7 @@ export class WebSearchProvider implements SearchProvider {
 
       // Check queued direct product pages for exact structured price & image
       if (pagesToInspect.length > 0) {
-        for (const page of pagesToInspect.slice(0, 3)) {
+        for (const page of pagesToInspect.slice(0, 4)) {
           const details = await fetchProductPageDetails(page.url);
           if (details) {
             const existingItem = items.find(i => i.url === page.url || i.sourceUrl === page.url);

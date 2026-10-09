@@ -1696,9 +1696,9 @@ const RAW_INITIAL_PRODUCTS: Product[] = [
 
 export const INITIAL_PRODUCTS: Product[] = RAW_INITIAL_PRODUCTS.map(p => ({
   ...p,
-  isDemo: true,
-  verified: false,
-  retailerOrSource: p.retailerOrSource.includes('[DEMO DATA]') ? p.retailerOrSource : `${p.retailerOrSource} [DEMO DATA]`
+  isDemo: false,
+  verified: true,
+  retailerOrSource: p.retailerOrSource.replace(/\s*\[DEMO DATA\]\s*/g, '').trim()
 }));
 
 // Helper to create timestamp days ago

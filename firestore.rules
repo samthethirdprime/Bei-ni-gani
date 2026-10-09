@@ -15,6 +15,11 @@ service cloud.firestore {
       return resource.data;
     }
 
+    // Connection test rule (used by testConnection bootstrap probe)
+    match /test/{testId} {
+      allow get, list: if true;
+    }
+
     // Products: readable by everyone in Kenya
     match /products/{productId} {
       allow get, list: if true;

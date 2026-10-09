@@ -24,7 +24,7 @@ import { fetchReportsForProduct } from '../services/firebaseService';
 import { PriceHistoryChart } from './PriceHistoryChart';
 import { VendorComparisonList } from './VendorComparisonList';
 import { formatPrice } from '../services/currencyService';
-import { getProductImageUrl } from '../services/imageUtils';
+import { getProductImageUrl, getGenericProductImage, isFallbackProductImage, discoverProductImageAsync } from '../services/imageUtils';
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -57,20 +57,64 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [copiedToastVisible, setCopiedToastVisible] = useState(false);
   const imageUrl = getProductImageUrl(product);
+  const [currentImgSrc, setCurrentImgSrc] = useState<string | null>(imageUrl);
   const [imageFailed, setImageFailed] = useState(false);
+  const [hasTriedProxy, setHasTriedProxy] = useState(false);
+  const [imgSource, setImgSource] = useState<'retailer' | 'fallback' | 'discovered' | 'generic' | null>(
+    imageUrl ? (isFallbackProductImage(imageUrl) ? 'fallback' : (product?.imageSource || 'retailer')) : null
+  );
 
   useEffect(() => {
+    setCurrentImgSrc(imageUrl);
     setImageFailed(false);
+    setHasTriedProxy(false);
+    setImgSource(imageUrl ? (isFallbackProductImage(imageUrl) ? 'fallback' : (product?.imageSource || 'retailer')) : null);
+
     if (product) {
       setLoadingReports(true);
       fetchReportsForProduct(product.id)
         .then(data => setReports(data))
         .finally(() => setLoadingReports(false));
     }
-  }, [product?.id, product?.reportsCount, imageUrl]);
+
+    // Trigger async discovery if product has no retailer image and no local fallback
+    if (!imageUrl && product?.name) {
+      let isCancelled = false;
+      discoverProductImageAsync({
+        name: product.name,
+        category: product.category,
+        brand: product.brand,
+        sizeOrQuantity: product.sizeOrQuantity,
+        subcategory: product.subcategory
+      }).then(discoveredUrl => {
+        if (!isCancelled && discoveredUrl) {
+          setCurrentImgSrc(discoveredUrl);
+          setImgSource('discovered');
+          setImageFailed(false);
+        }
+      });
+      return () => {
+        isCancelled = true;
+      };
+    }
+  }, [product?.id, product?.name, product?.reportsCount, imageUrl]);
 
   const handleImageError = () => {
-    setImageFailed(true);
+    if (!hasTriedProxy && currentImgSrc && (currentImgSrc.startsWith('http://') || currentImgSrc.startsWith('https://')) && !currentImgSrc.startsWith('/api/image-proxy')) {
+      setHasTriedProxy(true);
+      setCurrentImgSrc(`/api/image-proxy?url=${encodeURIComponent(currentImgSrc)}`);
+    } else if (currentImgSrc && !isFallbackProductImage(currentImgSrc) && imgSource !== 'discovered') {
+      // If genuine retailer image couldn't load (even via proxy), fallback to real matching product photograph
+      const generic = product ? getGenericProductImage(product) : null;
+      if (generic) {
+        setCurrentImgSrc(generic);
+        setImgSource('fallback');
+      } else {
+        setImageFailed(true);
+      }
+    } else {
+      setImageFailed(true);
+    }
   };
 
   if (!product) return null;
@@ -210,13 +254,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         <div className="overflow-y-auto p-5 space-y-6">
           {/* Main Visual & Info Header */}
           <div className="flex flex-col sm:flex-row gap-4 items-start">
-            <div className="w-full sm:w-44 h-48 sm:h-44 rounded-2xl overflow-hidden bg-neutral-950 border border-neutral-800 flex-shrink-0 flex items-center justify-center">
-              {imageUrl && !imageFailed ? (
+            <div className="relative w-full sm:w-44 h-48 sm:h-44 rounded-2xl overflow-hidden bg-neutral-950 border border-neutral-800 flex-shrink-0 flex items-center justify-center">
+              {currentImgSrc && !imageFailed ? (
                 <img
-                  src={imageUrl}
+                  src={currentImgSrc}
                   alt={product.name}
                   loading="eager"
                   decoding="async"
+                  referrerPolicy="no-referrer"
                   onError={handleImageError}
                   className="w-full h-full object-cover block"
                 />

@@ -43,6 +43,7 @@ export interface ExternalListing {
   availability: 'IN_STOCK' | 'OUT_OF_STOCK' | 'ON_ORDER' | 'UNKNOWN';
   dateCollected: string;
   imageUrl?: string;
+  imageSource?: 'retailer' | 'fallback' | 'discovered' | 'generic';
   specifications?: Record<string, string>;
   isVerified: boolean;
   notes?: string;
@@ -90,6 +91,7 @@ export interface GroupedProductComparison {
   category: string;
   subcategory?: string;
   image?: string;
+  imageSource?: 'retailer' | 'fallback' | 'discovered' | 'generic';
   lowestPrice: number;
   highestPrice: number;
   typicalPrice: number;

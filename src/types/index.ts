@@ -41,6 +41,7 @@ export interface VendorPrice {
   acquisitionMethod?: AcquisitionMethod;
   sourceUrl?: string;
   image?: string;
+  imageSource?: 'retailer' | 'fallback' | 'discovered' | 'generic';
   dateCollected: string;
   inStock?: boolean;
   notes?: string;
@@ -84,6 +85,7 @@ export interface Product {
   sizeOrQuantity: string;
   unit: string;
   image?: string;
+  imageSource?: 'retailer' | 'fallback' | 'discovered' | 'generic';
   typicalPrice: number;
   minPrice: number;
   maxPrice: number;

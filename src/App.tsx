@@ -265,11 +265,16 @@ export default function App() {
 
   // Displayed results after optional variant filter
   const displayedResults = useMemo(() => {
-    if (selectedVariantFilter === 'all') return searchResults;
+    let list = searchResults;
+    // In normal production search results, filter out demo/fake listings
+    if (searchQuery.trim().length >= 2) {
+      list = list.filter(p => !p.isDemo && !p.name.includes('[DEMO DATA]') && !(p.retailerOrSource && p.retailerOrSource.includes('[DEMO DATA]')));
+    }
+    if (selectedVariantFilter === 'all') return list;
     const group = availableVariants.find(g => g.key === selectedVariantFilter);
-    if (!group) return searchResults;
-    return searchResults.filter(group.matcher);
-  }, [searchResults, selectedVariantFilter, availableVariants]);
+    if (!group) return list;
+    return list.filter(group.matcher);
+  }, [searchResults, selectedVariantFilter, availableVariants, searchQuery]);
 
   // Partition results by source type so demo data NEVER impersonates live data
   const categorizedResults = useMemo(() => {
@@ -808,8 +813,8 @@ export default function App() {
               </section>
             )}
 
-            {/* 4. Demo Data Benchmarks */}
-            {categorizedResults.demo.length > 0 && (
+            {/* 4. Demo Data Benchmarks (never shown in normal production search results) */}
+            {searchQuery.trim().length === 0 && categorizedResults.demo.length > 0 && (
               <section className="space-y-3 pt-2 border-t border-neutral-800/80">
                 <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase tracking-wider">
                   <AlertCircle className="w-3.5 h-3.5" />

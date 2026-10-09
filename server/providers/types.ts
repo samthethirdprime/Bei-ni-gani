@@ -1,3 +1,5 @@
+// Types and data normalization for multi-provider live search engine
+
 export type SourceType = 'external' | 'community' | 'official' | 'demo';
 
 export type AcquisitionMethod = 
@@ -133,12 +135,12 @@ export function extractRawImageUrl(raw: unknown): string | null {
   }
 
   // Reject generic Unsplash images or generic placeholders per instructions
-  if (str.includes('unsplash.com')) {
+  if (str.includes('unsplash.com') || /\b(logo|site-logo|favicon|woocommerce-placeholder)\b/i.test(str)) {
     return null;
   }
 
-  // Handle local proxy URLs e.g. /api/image-proxy?url=...
-  if (str.startsWith('/api/image-proxy')) {
+  // Handle local proxy URLs or generic local assets e.g. /api/image-proxy?url=..., /generic-images/...
+  if (str.startsWith('/api/image-proxy') || str.startsWith('/generic-images/')) {
     return str;
   }
 
@@ -215,6 +217,10 @@ export function formatSearchResponse(
       const maxPrice = prices.length > 0 ? Math.max(...prices) : rep.price;
       const typicalPrice = prices.length > 0 ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : rep.price;
 
+      const hasGenuineImage = Boolean(validImage && !validImage.startsWith('/product-photos/') && !validImage.startsWith('/generic-images/'));
+      const resolvedProductImage = hasGenuineImage ? validImage : undefined;
+      const productImageSource: 'retailer' | 'fallback' = hasGenuineImage ? 'retailer' : 'fallback';
+
       return {
         id: `discovered-${clusterKey}-${pIdx}-${Date.now()}`,
         name: rep.name || query,
@@ -222,7 +228,8 @@ export function formatSearchResponse(
         category: rep.category || category || 'general',
         sizeOrQuantity: rep.unit || '1 unit',
         unit: rep.unit || 'unit',
-        image: validImage || undefined,
+        image: resolvedProductImage,
+        imageSource: productImageSource,
         typicalPrice,
         minPrice,
         maxPrice,
@@ -242,23 +249,28 @@ export function formatSearchResponse(
         isRealtimeDiscovered: true,
         verified: true,
         isDemo: false,
-        vendors: items.map((it, idx) => ({
-          id: `v-${idx}-${Date.now()}`,
-          vendorName: it.vendor,
-          price: it.price,
-          unit: it.unit || 'unit',
-          location: it.location || targetLocation,
-          sourceType: it.sourceType === 'community'
-            ? 'COMMUNITY'
-            : (it.sourceType === 'official' ? 'OFFICIAL' : 'ONLINE_RETAILER'),
-          acquisitionMethod: it.acquisitionMethod || (it.sourceType === 'official' ? 'official' : (it.sourceType === 'community' ? 'community' : 'search_snippet')),
-          sourceUrl: it.sourceUrl || it.url,
-          image: extractRawImageUrl(it.image || (it as any).imageUrl) || undefined,
-          dateCollected: it.retrievedAt || it.timestamp,
-          inStock: true,
-          notes: it.notes,
-          isDemo: false
-        })),
+        vendors: items.map((it, idx) => {
+          const itemImg = extractRawImageUrl(it.image || (it as any).imageUrl);
+          const hasItemGenuine = Boolean(itemImg && !itemImg.startsWith('/generic-images/'));
+          return {
+            id: `v-${idx}-${Date.now()}`,
+            vendorName: it.vendor,
+            price: it.price,
+            unit: it.unit || 'unit',
+            location: it.location || targetLocation,
+            sourceType: it.sourceType === 'community'
+              ? 'COMMUNITY'
+              : (it.sourceType === 'official' ? 'OFFICIAL' : 'ONLINE_RETAILER'),
+            acquisitionMethod: it.acquisitionMethod || (it.sourceType === 'official' ? 'official' : (it.sourceType === 'community' ? 'community' : 'search_snippet')),
+            sourceUrl: it.sourceUrl || it.url,
+            image: hasItemGenuine ? itemImg : undefined,
+            imageSource: hasItemGenuine ? 'retailer' : 'fallback',
+            dateCollected: it.retrievedAt || it.timestamp,
+            inStock: true,
+            notes: it.notes,
+            isDemo: false
+          };
+        }),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };

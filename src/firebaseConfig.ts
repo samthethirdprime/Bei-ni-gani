@@ -13,18 +13,20 @@ export interface AppFirebaseConfig {
   firestoreDatabaseId?: string;
 }
 
-const projectId = (import.meta.env.VITE_FIREBASE_PROJECT_ID as string) || defaultAppletConfig.projectId || 'bei-gani';
-const configuredDbId = (import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID as string) || 
-  (defaultAppletConfig as any).firestoreDatabaseId || 
-  '(default)';
+const env: Record<string, string | undefined> = (typeof import.meta !== 'undefined' && (import.meta as any).env)
+  ? (import.meta as any).env
+  : (typeof process !== 'undefined' && process.env ? (process.env as Record<string, string | undefined>) : {});
+
+const projectId = defaultAppletConfig.projectId || (env.VITE_FIREBASE_PROJECT_ID as string) || 'bei-gani';
+const configuredDbId = (defaultAppletConfig as any).firestoreDatabaseId || (env.VITE_FIREBASE_FIRESTORE_DATABASE_ID as string) || '(default)';
 
 const firebaseConfig: AppFirebaseConfig = {
-  apiKey: (import.meta.env.VITE_FIREBASE_API_KEY as string) || defaultAppletConfig.apiKey,
-  authDomain: (import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string) || `${projectId}.firebaseapp.com`,
+  apiKey: defaultAppletConfig.apiKey || (env.VITE_FIREBASE_API_KEY as string) || '',
+  authDomain: defaultAppletConfig.authDomain || (env.VITE_FIREBASE_AUTH_DOMAIN as string) || `${projectId}.firebaseapp.com`,
   projectId: projectId,
-  storageBucket: (import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string) || `${projectId}.firebasestorage.app`,
-  messagingSenderId: (import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string) || defaultAppletConfig.messagingSenderId,
-  appId: (import.meta.env.VITE_FIREBASE_APP_ID as string) || defaultAppletConfig.appId,
+  storageBucket: defaultAppletConfig.storageBucket || (env.VITE_FIREBASE_STORAGE_BUCKET as string) || `${projectId}.firebasestorage.app`,
+  messagingSenderId: defaultAppletConfig.messagingSenderId || (env.VITE_FIREBASE_MESSAGING_SENDER_ID as string) || '',
+  appId: defaultAppletConfig.appId || (env.VITE_FIREBASE_APP_ID as string) || '',
   firestoreDatabaseId: configuredDbId
 };
 

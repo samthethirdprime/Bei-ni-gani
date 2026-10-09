@@ -183,6 +183,7 @@ export function groupListingsIntoProducts(
       category: rep.category,
       subcategory: rep.subcategory,
       image: items.find(i => isTrustworthyImageUrl(i.imageUrl))?.imageUrl || undefined,
+      imageSource: items.find(i => isTrustworthyImageUrl(i.imageUrl)) ? 'retailer' : 'fallback',
       lowestPrice,
       highestPrice,
       typicalPrice,
