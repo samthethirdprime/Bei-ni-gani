@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Calendar, FileText, CheckCircle2, AlertCircle, Loader2, ArrowUpRight, Clock, ShieldCheck, Package } from 'lucide-react';
 import { Product } from '../types';
 import { savePriceComparisonToDrive, scheduleCalendarEvent } from '../services/workspaceService';
 import { getAccessToken, googleSignIn } from '../firebaseConfig';
-import { getProductImageUrl, isGenericProductImage } from '../services/imageUtils';
+import { getProductImageUrl, isGenericProductImage, discoverProductImageAsync } from '../services/imageUtils';
 
 interface WorkspaceModalProps {
   isOpen: boolean;
@@ -31,6 +31,34 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
   const [calendarNotes, setCalendarNotes] = useState(() => {
     return product ? `Check for price drops or restock for ${product.name} (Current range: KSh ${product.minPrice?.toLocaleString()} - ${product.maxPrice?.toLocaleString()}).` : '';
   });
+  const [modalImgSrc, setModalImgSrc] = useState<string | null>(() => getProductImageUrl(product));
+  const [modalImgFailed, setModalImgFailed] = useState(false);
+  const [hasTriedProxy, setHasTriedProxy] = useState(false);
+
+  useEffect(() => {
+    const url = getProductImageUrl(product);
+    setModalImgSrc(url);
+    setModalImgFailed(false);
+    setHasTriedProxy(false);
+
+    if (!url && product?.name) {
+      let isCancelled = false;
+      discoverProductImageAsync({
+        name: product.name,
+        category: product.category,
+        brand: product.brand,
+        sizeOrQuantity: product.sizeOrQuantity,
+        subcategory: product.subcategory
+      }).then(discovered => {
+        if (!isCancelled && discovered) {
+          setModalImgSrc(discovered);
+        }
+      });
+      return () => {
+        isCancelled = true;
+      };
+    }
+  }, [product]);
 
   if (!isOpen || !product) return null;
 
@@ -194,21 +222,26 @@ https://beigani.co.ke
 
           {/* Target Product Summary */}
           <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200/80">
-            {(() => {
-              const imgUrl = getProductImageUrl(product);
-              return imgUrl ? (
-                <img
-                  src={imgUrl}
-                  alt={product.name}
-                  referrerPolicy="no-referrer"
-                  className="w-14 h-14 object-cover rounded-lg bg-gray-100 border border-gray-200 shrink-0"
-                />
-              ) : (
-                <div className="w-14 h-14 flex items-center justify-center rounded-lg bg-gray-200 border border-gray-300 text-gray-500 shrink-0">
-                  <Package className="w-6 h-6 text-gray-500" />
-                </div>
-              );
-            })()}
+            {modalImgSrc && !modalImgFailed ? (
+              <img
+                src={modalImgSrc}
+                alt={product.name}
+                referrerPolicy="no-referrer"
+                className="w-14 h-14 object-cover rounded-lg bg-gray-100 border border-gray-200 shrink-0"
+                onError={() => {
+                  if (!hasTriedProxy && modalImgSrc.startsWith('http') && !modalImgSrc.startsWith('/api/image-proxy')) {
+                    setHasTriedProxy(true);
+                    setModalImgSrc(`/api/image-proxy?url=${encodeURIComponent(modalImgSrc)}`);
+                  } else {
+                    setModalImgFailed(true);
+                  }
+                }}
+              />
+            ) : (
+              <div className="w-14 h-14 flex items-center justify-center rounded-lg bg-gray-200 border border-gray-300 text-gray-500 shrink-0">
+                <Package className="w-6 h-6 text-gray-500" />
+              </div>
+            )}
             <div className="min-w-0">
               <h4 className="font-bold text-gray-900 text-sm truncate">{product.name}</h4>
               <p className="text-xs text-emerald-700 font-semibold mt-0.5">

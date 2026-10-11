@@ -60,6 +60,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [currentImgSrc, setCurrentImgSrc] = useState<string | null>(imageUrl);
   const [imageFailed, setImageFailed] = useState(false);
   const [hasTriedProxy, setHasTriedProxy] = useState(false);
+  const [hasTriedDiscovery, setHasTriedDiscovery] = useState(false);
   const [imgSource, setImgSource] = useState<'retailer' | 'fallback' | 'discovered' | 'generic' | null>(
     imageUrl ? (isFallbackProductImage(imageUrl) ? 'fallback' : (product?.imageSource || 'retailer')) : null
   );
@@ -68,6 +69,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     setCurrentImgSrc(imageUrl);
     setImageFailed(false);
     setHasTriedProxy(false);
+    setHasTriedDiscovery(false);
     setImgSource(imageUrl ? (isFallbackProductImage(imageUrl) ? 'fallback' : (product?.imageSource || 'retailer')) : null);
 
     if (product) {
@@ -80,6 +82,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     // Trigger async discovery if product has no retailer image and no local fallback
     if (!imageUrl && product?.name) {
       let isCancelled = false;
+      setHasTriedDiscovery(true);
       discoverProductImageAsync({
         name: product.name,
         category: product.category,
@@ -103,18 +106,42 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     if (!hasTriedProxy && currentImgSrc && (currentImgSrc.startsWith('http://') || currentImgSrc.startsWith('https://')) && !currentImgSrc.startsWith('/api/image-proxy')) {
       setHasTriedProxy(true);
       setCurrentImgSrc(`/api/image-proxy?url=${encodeURIComponent(currentImgSrc)}`);
-    } else if (currentImgSrc && !isFallbackProductImage(currentImgSrc) && imgSource !== 'discovered') {
-      // If genuine retailer image couldn't load (even via proxy), fallback to real matching product photograph
+      return;
+    }
+
+    if (currentImgSrc && !isFallbackProductImage(currentImgSrc)) {
       const generic = product ? getGenericProductImage(product) : null;
       if (generic) {
         setCurrentImgSrc(generic);
         setImgSource('fallback');
-      } else {
-        setImageFailed(true);
+        return;
       }
-    } else {
-      setImageFailed(true);
     }
+
+    if (!hasTriedDiscovery && product?.name && imgSource !== 'discovered') {
+      setHasTriedDiscovery(true);
+      discoverProductImageAsync({
+        name: product.name,
+        category: product.category,
+        brand: product.brand,
+        sizeOrQuantity: product.sizeOrQuantity,
+        subcategory: product.subcategory
+      }).then(discoveredUrl => {
+        if (discoveredUrl) {
+          setCurrentImgSrc(discoveredUrl);
+          setImgSource('discovered');
+          setHasTriedProxy(false);
+          setImageFailed(false);
+        } else {
+          setImageFailed(true);
+        }
+      }).catch(() => {
+        setImageFailed(true);
+      });
+      return;
+    }
+
+    setImageFailed(true);
   };
 
   if (!product) return null;
