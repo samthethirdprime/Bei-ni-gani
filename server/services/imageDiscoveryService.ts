@@ -53,6 +53,43 @@ function extractSourceFromUrl(purl: string): string {
   }
 }
 
+// Check if a brand string is a synthetic or generic descriptor
+function isGenericBrandDescriptor(brand?: string): boolean {
+  if (!brand) return false;
+  const b = brand.trim().toLowerCase();
+  if (/^generic\b/i.test(b)) return true;
+  if (/^(unknown|various|unbranded|n\/a|none|generic|no brand)$/i.test(b)) return true;
+  return false;
+}
+
+// Clean product name for discovery search query without losing core nouns
+function cleanProductQueryName(name: string): string {
+  let n = name;
+  if (n.includes('(') && n.includes('/')) {
+    // Keep alternative product/brand names without parens/slashes
+    n = n.replace(/[\/\\()]/g, ' ');
+  } else {
+    // Strip technical spec or size parentheticals like (Pair of 10kg), (3.0 HP Motor), (10mm NBR)
+    n = n.replace(/\([^)]*\)/g, ' ');
+  }
+  return n
+    .replace(/\b(non-slip|high density)\b/gi, '')
+    .replace(/[\/\\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Extract concise size / unit token to prevent query bloating
+function cleanProductSize(size?: string): string {
+  if (!size) return '';
+  const unitMatch = size.match(/\b\d+(?:\.\d+)?\s*(?:kg|g|ml|l|ltr|mm|cm|m)\b/i);
+  if (unitMatch && !size.includes('/')) return unitMatch[0];
+  if (size.length <= 12 && !size.includes('/') && !size.includes('doorway')) {
+    return size.replace(/\([^)]*\)/g, '').trim();
+  }
+  return '';
+}
+
 // Validate candidate image against strict criteria
 export function validateCandidateImage(
   murl: string,
@@ -78,14 +115,58 @@ export function validateCandidateImage(
   if (nonPhotoRegex.test(murlLower)) return false;
   if (nonPhotoRegex.test(titleLower)) return false;
 
+  // Reject spare parts, replacement components, and manuals
+  const nonProductRegex = /\b(spare parts|replacement motor|drive motor|circuit board|repair manual|belt replacement)\b/i;
+  if (nonProductRegex.test(titleLower)) return false;
+
   // 4. Reject if file extension indicates non-image format
   if (/\.(svg|pdf|gif|ico|bmp)(\?|$)/i.test(murlLower)) return false;
 
-  // 5. Brand validation: If brand is specified, the brand MUST be present in title, page URL, or image URL
+  // 5. Brand validation: distinguish between:
+  // - Real, explicitly identified manufacturer
+  // - Generic descriptor such as "Generic Leather"
+  // - Composite brand field containing alternatives separated by "/" (e.g. "NordicTrack / ProForm")
   if (params.brand && params.brand.trim().length > 1) {
-    const brandLower = params.brand.toLowerCase().trim();
-    const hasBrand = titleLower.includes(brandLower) || purlLower.includes(brandLower) || murlLower.includes(brandLower);
-    if (!hasBrand) return false;
+    const rawBrand = params.brand.trim();
+    const brandLower = rawBrand.toLowerCase();
+
+    const isGeneric = isGenericBrandDescriptor(rawBrand);
+    if (!isGeneric) {
+      if (rawBrand.includes('/')) {
+        // Composite brand field: accept genuine match to an individual explicitly listed brand
+        const subBrands = rawBrand
+          .split('/')
+          .map(b => b.trim().toLowerCase())
+          .filter(b => b.length > 1 && !isGenericBrandDescriptor(b));
+
+        if (subBrands.length > 0) {
+          const hasAnySubBrand = subBrands.some(b => {
+            const bNoSpace = b.replace(/[^a-z0-9]/g, '');
+            return titleLower.includes(b) ||
+              purlLower.includes(b) ||
+              murlLower.includes(b) ||
+              (bNoSpace.length > 2 && (titleLower.replace(/[^a-z0-9]/g, '').includes(bNoSpace) || purlLower.includes(bNoSpace)));
+          });
+
+          if (!hasAnySubBrand) return false;
+        }
+      } else {
+        // Real, explicitly identified single manufacturer: match with spacing and case normalization
+        const bNoSpace = brandLower.replace(/[^a-z0-9]/g, '');
+        const bSpaced = brandLower.replace(/([a-z])([0-9a-z])/g, '$1 $2');
+        const titleNoSpace = titleLower.replace(/[^a-z0-9]/g, '');
+
+        const hasBrand = titleLower.includes(brandLower) ||
+          purlLower.includes(brandLower) ||
+          murlLower.includes(brandLower) ||
+          titleLower.includes(bSpaced) ||
+          (bNoSpace.length > 2 && (titleNoSpace.includes(bNoSpace) || purlLower.includes(bNoSpace)));
+
+        if (!hasBrand) return false;
+      }
+    }
+    // For generic descriptors (e.g. "Generic Leather"), do not require literal string in title or URL.
+    // Continue checking core tokens, category relevance, and anti-collision guards below.
   }
 
   // 6. Core tokens matching: The product type/name core nouns must match
@@ -110,6 +191,10 @@ export function validateCandidateImage(
   // Watermelon vs bottled water
   if ((nameLower.includes('watermelon') || nameLower.includes('tikiti')) &&
       (titleLower.includes('bottled water') || titleLower.includes('water tank') || titleLower.includes('mineral water'))) {
+    return false;
+  }
+  if ((nameLower.includes('bottled water') || nameLower.includes('drinking water')) &&
+      (titleLower.includes('watermelon') || titleLower.includes('tikiti'))) {
     return false;
   }
 
@@ -141,16 +226,27 @@ export async function discoverProductPhotograph(
   }
 
   // Construct highly specific product photograph query
-  const brandPrefix = params.brand && !cleanName.toLowerCase().includes(params.brand.toLowerCase())
-    ? `${params.brand} `
-    : '';
-  const sizeSuffix = params.size && !cleanName.toLowerCase().includes(params.size.toLowerCase())
-    ? ` ${params.size}`
-    : '';
-  const searchQuery = `${brandPrefix}${cleanName}${sizeSuffix} product photo Kenya`.trim();
+  const queryName = cleanProductQueryName(cleanName);
+  const isGeneric = isGenericBrandDescriptor(params.brand);
+
+  let brandPrefix = '';
+  if (params.brand && !isGeneric) {
+    const primary = params.brand.includes('/') ? params.brand.split('/')[0].trim() : params.brand.trim();
+    if (primary && !queryName.toLowerCase().includes(primary.toLowerCase())) {
+      brandPrefix = `${primary} `;
+    }
+  }
+
+  const s = cleanProductSize(params.size);
+  let sizeSuffix = '';
+  if (s && !queryName.toLowerCase().includes(s.toLowerCase())) {
+    sizeSuffix = ` ${s}`;
+  }
+
+  const searchQuery = `${brandPrefix}${queryName}${sizeSuffix}`.trim();
 
   try {
-    const url = `https://www.bing.com/images/search?q=${encodeURIComponent(searchQuery)}&first=1&scenario=ImageBasicHover`;
+    const url = `https://www.bing.com/images/search?q=${encodeURIComponent(searchQuery)}&form=HDRSC2`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 6500);
 
@@ -158,7 +254,8 @@ export async function discoverProductPhotograph(
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-GB,en;q=0.9'
+        'Accept-Language': 'en-GB,en;q=0.9',
+        'Cookie': 'SRCHHPGUSR=ADLT=OFF;'
       },
       signal: controller.signal
     });
@@ -181,9 +278,38 @@ export async function discoverProductPhotograph(
         const purl = data.purl || '';
 
         if (validateCandidateImage(murl, title, purl, params)) {
+          let finalImageUrl = murl;
+
+          // Probe candidate reachability to prevent returning 404 or anti-bot challenge pages
+          try {
+            const probeController = new AbortController();
+            const probeTimeout = setTimeout(() => probeController.abort(), 2000);
+            const probeRes = await fetch(murl, {
+              method: 'HEAD',
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept': 'image/*,*/*;q=0.8'
+              },
+              signal: probeController.signal
+            });
+            clearTimeout(probeTimeout);
+            const ct = (probeRes.headers.get('content-type') || '').toLowerCase();
+            if (!probeRes.ok || ct.includes('text/html')) {
+              if (data.turl && typeof data.turl === 'string' && data.turl.startsWith('http')) {
+                finalImageUrl = data.turl;
+              } else {
+                continue;
+              }
+            }
+          } catch {
+            if (data.turl && typeof data.turl === 'string' && data.turl.startsWith('http')) {
+              finalImageUrl = data.turl;
+            }
+          }
+
           const result: DiscoveredImageResult = {
-            imageUrl: murl,
-            thumbnailUrl: data.turl || murl,
+            imageUrl: finalImageUrl,
+            thumbnailUrl: data.turl || finalImageUrl,
             title,
             pageUrl: purl,
             source: extractSourceFromUrl(purl),

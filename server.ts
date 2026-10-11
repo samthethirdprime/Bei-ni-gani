@@ -152,6 +152,9 @@ app.get('/api/image-proxy', async (req, res) => {
     }
 
     const contentType = imageRes.headers.get('content-type') || 'image/jpeg';
+    if (!contentType.toLowerCase().startsWith('image/')) {
+      return res.status(404).send('Target is not a valid image');
+    }
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
     res.setHeader('Access-Control-Allow-Origin', '*');

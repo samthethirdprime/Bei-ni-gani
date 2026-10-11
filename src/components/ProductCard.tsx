@@ -34,6 +34,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const [currentImgSrc, setCurrentImgSrc] = useState<string | null>(imageUrl);
   const [imageFailed, setImageFailed] = useState(false);
   const [hasTriedProxy, setHasTriedProxy] = useState(false);
+  const [hasTriedDiscovery, setHasTriedDiscovery] = useState(false);
   const [imgSource, setImgSource] = useState<'retailer' | 'fallback' | 'discovered' | 'generic' | null>(
     imageUrl ? (isFallbackProductImage(imageUrl) ? 'fallback' : (product.imageSource || 'retailer')) : null
   );
@@ -45,11 +46,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     setCurrentImgSrc(imageUrl);
     setImageFailed(false);
     setHasTriedProxy(false);
+    setHasTriedDiscovery(false);
     setImgSource(imageUrl ? (isFallbackProductImage(imageUrl) ? 'fallback' : (product.imageSource || 'retailer')) : null);
 
     // Dynamic discovery: ONLY run if no retailer image and no local photographic fallback
     if (!imageUrl && product?.name) {
       let isCancelled = false;
+      setHasTriedDiscovery(true);
       discoverProductImageAsync({
         name: product.name,
         category: product.category,
@@ -70,22 +73,49 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   }, [imageUrl, product?.id, product?.name, product?.brand, product?.sizeOrQuantity, product?.category]);
 
   const handleImageError = () => {
-    // If direct external image failed, automatically fall back to local image proxy
+    // 1. If direct external image failed, automatically fall back to local image proxy first
     if (!hasTriedProxy && currentImgSrc && (currentImgSrc.startsWith('http://') || currentImgSrc.startsWith('https://')) && !currentImgSrc.startsWith('/api/image-proxy')) {
       setHasTriedProxy(true);
       setCurrentImgSrc(`/api/image-proxy?url=${encodeURIComponent(currentImgSrc)}`);
-    } else if (currentImgSrc && !isFallbackProductImage(currentImgSrc) && imgSource !== 'discovered') {
-      // If genuine retailer image couldn't load, fallback to real matching product photograph
+      return;
+    }
+
+    // 2. If proxy or non-proxy image failed, check if curated local photographic fallback exists
+    if (currentImgSrc && !isFallbackProductImage(currentImgSrc)) {
       const fallback = getGenericProductImage(product);
       if (fallback) {
         setCurrentImgSrc(fallback);
         setImgSource('fallback');
-      } else {
-        setImageFailed(true);
+        return;
       }
-    } else {
-      setImageFailed(true);
     }
+
+    // 3. If no local fallback exists and we haven't tried dynamic discovery yet:
+    if (!hasTriedDiscovery && product?.name && imgSource !== 'discovered') {
+      setHasTriedDiscovery(true);
+      discoverProductImageAsync({
+        name: product.name,
+        category: product.category,
+        brand: product.brand,
+        sizeOrQuantity: product.sizeOrQuantity,
+        subcategory: product.subcategory
+      }).then(discoveredUrl => {
+        if (discoveredUrl) {
+          setCurrentImgSrc(discoveredUrl);
+          setImgSource('discovered');
+          setHasTriedProxy(false);
+          setImageFailed(false);
+        } else {
+          setImageFailed(true);
+        }
+      }).catch(() => {
+        setImageFailed(true);
+      });
+      return;
+    }
+
+    // 4. All fallback layers exhausted -> neutral package placeholder
+    setImageFailed(true);
   };
 
   const handleConfirmClick = async (e: React.MouseEvent) => {
