@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Calendar, FileText, CheckCircle2, AlertCircle, Loader2, ArrowUpRight, Clock, ShieldCheck, Package } from 'lucide-react';
 import { Product } from '../types';
 import { savePriceComparisonToDrive, scheduleCalendarEvent } from '../services/workspaceService';
 import { getAccessToken, googleSignIn } from '../firebaseConfig';
-import { getProductImageUrl, isGenericProductImage, discoverProductImageAsync } from '../services/imageUtils';
+import { getProductImageUrl, isGenericProductImage, discoverProductImageAsync, getGenericProductImage } from '../services/imageUtils';
 
 interface WorkspaceModalProps {
   isOpen: boolean;
@@ -33,16 +33,20 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
   });
   const [modalImgSrc, setModalImgSrc] = useState<string | null>(() => getProductImageUrl(product));
   const [modalImgFailed, setModalImgFailed] = useState(false);
-  const [hasTriedProxy, setHasTriedProxy] = useState(false);
+  const [hasTriedDiscovery, setHasTriedDiscovery] = useState(false);
+  const triedUrlsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    triedUrlsRef.current.clear();
     const url = getProductImageUrl(product);
     setModalImgSrc(url);
     setModalImgFailed(false);
-    setHasTriedProxy(false);
+    setHasTriedDiscovery(false);
 
     if (!url && product?.name) {
       let isCancelled = false;
+      const currentProductId = product.id;
+      setHasTriedDiscovery(true);
       discoverProductImageAsync({
         name: product.name,
         category: product.category,
@@ -50,7 +54,7 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
         sizeOrQuantity: product.sizeOrQuantity,
         subcategory: product.subcategory
       }).then(discovered => {
-        if (!isCancelled && discovered) {
+        if (!isCancelled && product?.id === currentProductId && discovered) {
           setModalImgSrc(discovered);
         }
       });
@@ -229,12 +233,46 @@ https://beigani.co.ke
                 referrerPolicy="no-referrer"
                 className="w-14 h-14 object-cover rounded-lg bg-gray-100 border border-gray-200 shrink-0"
                 onError={() => {
-                  if (!hasTriedProxy && modalImgSrc.startsWith('http') && !modalImgSrc.startsWith('/api/image-proxy')) {
-                    setHasTriedProxy(true);
-                    setModalImgSrc(`/api/image-proxy?url=${encodeURIComponent(modalImgSrc)}`);
-                  } else {
-                    setModalImgFailed(true);
+                  const failedSrc = modalImgSrc;
+                  if (failedSrc) {
+                    triedUrlsRef.current.add(failedSrc);
                   }
+                  if (failedSrc && failedSrc.startsWith('http') && !failedSrc.startsWith('/api/image-proxy')) {
+                    const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(failedSrc)}`;
+                    if (!triedUrlsRef.current.has(proxyUrl)) {
+                      triedUrlsRef.current.add(proxyUrl);
+                      setModalImgSrc(proxyUrl);
+                      return;
+                    }
+                  }
+                  const fallback = getGenericProductImage(product);
+                  if (fallback && !triedUrlsRef.current.has(fallback)) {
+                    triedUrlsRef.current.add(fallback);
+                    setModalImgSrc(fallback);
+                    return;
+                  }
+                  if (!hasTriedDiscovery && product?.name) {
+                    setHasTriedDiscovery(true);
+                    const currentProductId = product.id;
+                    discoverProductImageAsync({
+                      name: product.name,
+                      category: product.category,
+                      brand: product.brand,
+                      sizeOrQuantity: product.sizeOrQuantity,
+                      subcategory: product.subcategory
+                    }).then(discovered => {
+                      if (product?.id === currentProductId && discovered && !triedUrlsRef.current.has(discovered)) {
+                        setModalImgSrc(discovered);
+                        setModalImgFailed(false);
+                      } else {
+                        setModalImgFailed(true);
+                      }
+                    }).catch(() => {
+                      setModalImgFailed(true);
+                    });
+                    return;
+                  }
+                  setModalImgFailed(true);
                 }}
               />
             ) : (

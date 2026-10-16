@@ -49,8 +49,11 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  // Determine short badge display text
-  const locationBadge = (selectedLocation || selectedCounty) ? (selectedLocation || selectedCounty) : 'Worldwide';
+  // Determine short badge display text (default Kenya)
+  const rawBadge = (selectedLocation || selectedCounty || '').trim();
+  const locationBadge = (!rawBadge || ['worldwide', 'global', 'all', 'all locations'].includes(rawBadge.toLowerCase()))
+    ? 'Kenya'
+    : rawBadge;
 
   return (
     <header className="sticky top-0 z-30 bg-neutral-950/90 backdrop-blur-md border-b border-neutral-800/80 px-2.5 sm:px-4 py-2.5 sm:py-3 w-full max-w-full">
@@ -66,7 +69,7 @@ export const Header: React.FC<HeaderProps> = ({
                 BEI GANI<span className="text-emerald-400">?</span>
               </h1>
               <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60 hidden sm:inline-block">
-                GLOBAL
+                KENYA
               </span>
             </div>
             <p className="text-[11px] sm:text-xs text-neutral-400 font-medium tracking-tight truncate hidden md:block">
@@ -77,7 +80,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right side controls */}
         <div className="flex items-center gap-1 sm:gap-2 flex-shrink min-w-0 justify-end">
-          {/* Worldwide Location Selector Button */}
+          {/* Kenyan Location Selector Button */}
           <button
             type="button"
             onClick={(e) => {
@@ -88,7 +91,7 @@ export const Header: React.FC<HeaderProps> = ({
               }
             }}
             className="flex items-center gap-1 sm:gap-1.5 bg-neutral-900 hover:bg-neutral-800 active:bg-neutral-700 text-xs font-semibold text-neutral-200 border border-neutral-800 hover:border-neutral-700 rounded-xl px-2 sm:px-2.5 py-1.5 transition-all max-w-[75px] xs:max-w-[110px] sm:max-w-[180px] cursor-pointer shadow-sm select-none flex-shrink truncate"
-            title="Select Worldwide or Kenyan Location"
+            title="Select Kenyan County or Town"
             aria-label={`Select location (currently ${locationBadge})`}
           >
             <MapPin className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />

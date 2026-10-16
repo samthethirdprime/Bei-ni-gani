@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import dotenv from 'dotenv';
 import { searchAggregator } from './server/providers/searchAggregator';
 import { formatSearchResponse } from './server/providers/types';
@@ -31,7 +32,8 @@ const handleSearchRequest = async (req: express.Request, res: express.Response) 
   }
 
   const cleanQuery = query.trim();
-  const targetCounty = (typeof county === 'string' && county.trim()) ? county.trim() : 'Kenya';
+  const rawLoc = (typeof county === 'string' && county.trim()) ? county.trim() : 'Kenya';
+  const targetCounty = (rawLoc.toLowerCase() === 'worldwide' || rawLoc.toLowerCase() === 'global' || !rawLoc) ? 'Kenya' : rawLoc;
   const targetCategory = typeof category === 'string' ? category : undefined;
   const cacheKey = `${cleanQuery.toLowerCase()}|${targetCounty.toLowerCase()}|${targetCategory || 'any'}`;
 
@@ -136,7 +138,7 @@ app.get('/api/image-proxy', async (req, res) => {
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    const timeout = setTimeout(() => controller.abort(), 8000);
 
     const imageRes = await fetch(targetUrl, {
       headers: {
@@ -241,22 +243,25 @@ app.get('/api/connectors/status', (req, res) => {
 
 // Setup Vite middleware in dev or static files in production
 async function startServer() {
-  if (!isProd) {
+  const distIndexPath = path.resolve(rootDir, 'dist', 'index.html');
+  const hasDist = fs.existsSync(distIndexPath);
+
+  if (isProd && hasDist) {
+    app.use(express.static(path.resolve(rootDir, 'dist')));
+    app.get('*', (req, res) => {
+      res.sendFile(distIndexPath);
+    });
+  } else {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
-  } else {
-    app.use(express.static(path.resolve(rootDir, 'dist')));
-    app.get('*', (req, res) => {
-      res.sendFile(path.resolve(rootDir, 'dist', 'index.html'));
-    });
   }
 
   app.listen(Number(PORT), '0.0.0.0', () => {
-    console.log(`BEI GANI? Server running on http://0.0.0.0:${PORT} (${isProd ? 'production' : 'development'})`);
+    console.log(`BEI GANI? Server running on http://0.0.0.0:${PORT} (${isProd && hasDist ? 'production' : 'development/vite-middleware'})`);
   });
 }
 

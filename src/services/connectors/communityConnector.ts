@@ -38,47 +38,63 @@ export class CommunityReportsConnector implements SourceConnector {
     const targetLoc = locationFilter || searchQuery.detectedLocation;
     const cleanQ = searchQuery.itemQuery.toLowerCase().trim();
 
-    // 1. Fetch real community reports from Firebase Firestore
+    // 1. Fetch real community reports from Firebase Firestore with safety timeout
     try {
-      const qSnap = await getDocs(firestoreQuery(collection(db, 'reports'), limit(100)));
-      qSnap.forEach(docSnap => {
-        const data = docSnap.data();
-        if (data && data.productName && data.reportedPrice) {
-          const prodName = String(data.productName).toLowerCase();
-          // Match against search query tokens if query is present
-          if (cleanQ && !prodName.includes(cleanQ) && !cleanQ.includes(prodName)) {
-            return;
-          }
-
-          const l: ExternalListing = {
-            id: `comm-${docSnap.id}`,
-            productId: data.productId || `custom-${docSnap.id}`,
-            productName: data.productName,
-            category: data.category || 'general',
-            price: Number(data.reportedPrice),
-            currency: 'KES',
-            vendor: data.storeName || 'Local Estate Shop / Market Stall',
-            location: `${data.area || data.town || ''}, ${data.county || 'Kenya'}`.trim().replace(/^,\s*/, ''),
-            county: data.county,
-            town: data.town,
-            area: data.area,
-            source: 'Bei Gani Community',
-            sourceCategory: 'COMMUNITY',
-            sourceMethod: this.accessMethod,
-            availability: 'IN_STOCK',
-            dateCollected: data.purchaseDate || 'Recent',
-            imageUrl: data.receiptUrl || undefined,
-            isVerified: true,
-            isDemo: false,
-            notes: data.notes || 'Verified by community user submission in Firebase'
-          };
-
-          // Apply strict location if specified
-          if (!targetLoc || matchesStrictLocation(l, targetLoc)) {
-            listings.push(l);
-          }
-        }
+      let timeoutHandle: any;
+      const timeoutPromise = new Promise<null>((resolve) => {
+        timeoutHandle = setTimeout(() => resolve(null), 1200);
+        if (timeoutHandle && timeoutHandle.unref) timeoutHandle.unref();
       });
+      const docsPromise = getDocs(firestoreQuery(collection(db, 'reports'), limit(100))).catch((err) => {
+        console.warn('[CommunityConnector] Firestore getDocs note:', err?.message || err);
+        return null;
+      });
+      const qSnap = await Promise.race([
+        docsPromise,
+        timeoutPromise
+      ]).finally(() => {
+        if (timeoutHandle) clearTimeout(timeoutHandle);
+      });
+      if (qSnap) {
+        qSnap.forEach(docSnap => {
+          const data = docSnap.data();
+          if (data && data.productName && data.reportedPrice) {
+            const prodName = String(data.productName).toLowerCase();
+            // Match against search query tokens if query is present
+            if (cleanQ && !prodName.includes(cleanQ) && !cleanQ.includes(prodName)) {
+              return;
+            }
+
+            const l: ExternalListing = {
+              id: `comm-${docSnap.id}`,
+              productId: data.productId || `custom-${docSnap.id}`,
+              productName: data.productName,
+              category: data.category || 'general',
+              price: Number(data.reportedPrice),
+              currency: 'KES',
+              vendor: data.storeName || 'Local Estate Shop / Market Stall',
+              location: `${data.area || data.town || ''}, ${data.county || 'Kenya'}`.trim().replace(/^,\s*/, ''),
+              county: data.county,
+              town: data.town,
+              area: data.area,
+              source: 'Bei Gani Community',
+              sourceCategory: 'COMMUNITY',
+              sourceMethod: this.accessMethod,
+              availability: 'IN_STOCK',
+              dateCollected: data.purchaseDate || 'Recent',
+              imageUrl: data.receiptUrl || undefined,
+              isVerified: Boolean(data.verified),
+              isDemo: false,
+              notes: data.notes || 'Community price report submitted by shopper in Kenya'
+            };
+
+            // Apply strict location if specified
+            if (!targetLoc || matchesStrictLocation(l, targetLoc)) {
+              listings.push(l);
+            }
+          }
+        });
+      }
     } catch (e) {
       console.warn('[CommunityConnector] Firestore query note:', e);
     }

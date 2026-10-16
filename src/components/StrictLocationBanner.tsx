@@ -42,8 +42,8 @@ export const StrictLocationBanner: React.FC<StrictLocationBannerProps> = ({
           onClick={onClearLocation}
           className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 rounded-xl font-bold text-xs sm:text-sm transition-all shadow-md active:scale-95 cursor-pointer"
         >
-          <Globe className="w-4 h-4" />
-          Search Worldwide (All Locations)
+          <MapPin className="w-4 h-4" />
+          Search All Kenya (National)
         </button>
 
         {onOpenLocationModal && (

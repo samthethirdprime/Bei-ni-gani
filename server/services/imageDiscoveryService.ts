@@ -54,17 +54,24 @@ function extractSourceFromUrl(purl: string): string {
 }
 
 // Check if a brand string is a synthetic or generic descriptor
-function isGenericBrandDescriptor(brand?: string): boolean {
+export function isGenericBrandDescriptor(brand?: string): boolean {
   if (!brand) return false;
   const b = brand.trim().toLowerCase();
   if (/^generic\b/i.test(b)) return true;
-  if (/^(unknown|various|unbranded|n\/a|none|generic|no brand)$/i.test(b)) return true;
+  if (/^(unknown|various|unbranded|n\/a|none|generic|no brand|speedfit|powerfit)$/i.test(b)) return true;
   return false;
 }
 
 // Clean product name for discovery search query without losing core nouns
-function cleanProductQueryName(name: string): string {
+export function cleanProductQueryName(name: string): string {
   let n = name;
+
+  // Strip price intelligence and retailer snippet boilerplate
+  n = n.replace(/\s*(?:reported\s+)?price\s+in\s+kenya.*$/i, '');
+  n = n.replace(/\s*\|\s*(?:agrisoko|buy\s+online|selina\s+wamucii|mahitaji|naivas|gobeba|taste\s+kenya|jumia|kilimall|jiji).*$/i, '');
+  n = n.replace(/\s*-\s*(?:selina\s+wamucii|mahitaji|naivas|gobeba|taste\s+kenya|jumia|kilimall|jiji).*$/i, '');
+  n = n.replace(/\s*KES\s*\d+.*$/i, '');
+
   if (n.includes('(') && n.includes('/')) {
     // Keep alternative product/brand names without parens/slashes
     n = n.replace(/[\/\\()]/g, ' ');
@@ -72,11 +79,41 @@ function cleanProductQueryName(name: string): string {
     // Strip technical spec or size parentheticals like (Pair of 10kg), (3.0 HP Motor), (10mm NBR)
     n = n.replace(/\([^)]*\)/g, ' ');
   }
-  return n
+
+  let cleaned = n
     .replace(/\b(non-slip|high density)\b/gi, '')
     .replace(/[\/\\]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+
+  const lower = cleaned.toLowerCase();
+
+  // Enhance product relevance for specific ambiguous terms
+  if (/\bfortified\s+maize\s+flour\b/i.test(lower)) {
+    cleaned = 'fortified sifted maize flour 2kg kenya';
+  } else if (/\b(maize flour|unga wa ugali)\b/i.test(lower)) {
+    cleaned = 'sifted maize meal unga wa ugali 2kg kenya';
+  } else if (/\bfortified\s+wheat\s+flour\b/i.test(lower)) {
+    cleaned = 'fortified home baking wheat flour 2kg';
+  } else if (/\b(wheat flour|unga wa ngano)\b/i.test(lower)) {
+    cleaned = 'home baking wheat flour 2kg';
+  } else if (lower === 'laptop' || lower === 'laptops') {
+    cleaned = 'laptop computer notebook';
+  } else if (/\b(multimedia speaker|speaker system|speakers?)\b/i.test(lower) && !/\b(subwoofer)\b/i.test(lower)) {
+    cleaned = `${cleaned} with subwoofer`;
+  } else if (/\b(water dispenser)\b/i.test(lower)) {
+    cleaned = 'water dispenser hot and cold appliance';
+  } else if (/\b(adult wellness|sexual wellness)\b/i.test(lower)) {
+    cleaned = 'personal wellness intimate care retail packaging';
+  } else if (/\b(dildo|dildos)\b/i.test(lower)) {
+    cleaned = 'silicone personal body massager retail product';
+  } else if (/\b(tv\s+stand|tv\s+console)\b/i.test(lower)) {
+    cleaned = 'tv stand console entertainment unit furniture';
+  } else if ((lower === "men's classic leather" || lower === "mens classic leather" || lower === "classic leather") && !/\b(loafer|shoe|shoes)\b/i.test(lower)) {
+    cleaned = `${cleaned} formal loafers shoes`;
+  }
+
+  return cleaned;
 }
 
 // Extract concise size / unit token to prevent query bloating
@@ -110,13 +147,20 @@ export function validateCandidateImage(
   // 2. Reject Unsplash images per instructions
   if (murlLower.includes('unsplash.com')) return false;
 
-  // 3. Reject non-photographic assets: cartoons, illustrations, logos, banners, clipart, vectors
-  const nonPhotoRegex = /\b(logo|site-logo|favicon|banner|badge|vector|clipart|cartoon|illustration|drawing|sketch|watermark|screenshot|placeholder|avatar)\b/i;
+  // 3. Reject non-photographic assets: cartoons, illustrations, logos, banners, clipart, vectors, presentation slides
+  const nonPhotoRegex = /\b(logo|site-logo|favicon|banner|badge|vector|clipart|cartoon|illustration|drawing|sketch|watermark|screenshot|placeholder|avatar|coloring\s*page|stock\s*vector|slide|slides|presentation|powerpoint|презентация|mockup|packaging\s*design|design\s*on\s*kraft|kraft\s*paper\s*design)\b/i;
   if (nonPhotoRegex.test(murlLower)) return false;
   if (nonPhotoRegex.test(titleLower)) return false;
 
+  // Reject known watermark stock image domains, AI image portals, design portfolios, and slow/challenge B2B wholesale portals
+  const stockWatermarkDomains = /\b(dreamstime\.com|vecteezy\.com|shutterstock\.com|istockphoto\.com|alamy\.com|freepik\.com|123rf\.com|depositphotos\.com|vectorstock\.com|canstockphoto\.com|imimg\.com|tradeindia\.com|exportersindia\.com|ppt-online\.org|slideshare\.net|stablediffusionweb\.com|craiyon\.com|behance\.net|dribbble\.com)\b/i;
+  if (stockWatermarkDomains.test(murlLower) || stockWatermarkDomains.test(purlLower)) return false;
+
+  // Reject CDNs returning 53-byte HTML challenge pages or protocol errors
+  if (murlLower.includes('cdn.mafrservices.com')) return false;
+
   // Reject spare parts, replacement components, and manuals
-  const nonProductRegex = /\b(spare parts|replacement motor|drive motor|circuit board|repair manual|belt replacement)\b/i;
+  const nonProductRegex = /\b(spare parts|replacement motor|drive motor|circuit board|repair manual|belt replacement|disassembly|teardown)\b/i;
   if (nonProductRegex.test(titleLower)) return false;
 
   // 4. Reject if file extension indicates non-image format
@@ -124,7 +168,7 @@ export function validateCandidateImage(
 
   // 5. Brand validation: distinguish between:
   // - Real, explicitly identified manufacturer
-  // - Generic descriptor such as "Generic Leather"
+  // - Generic descriptor such as "Generic Leather", "SpeedFit", "PowerFit"
   // - Composite brand field containing alternatives separated by "/" (e.g. "NordicTrack / ProForm")
   if (params.brand && params.brand.trim().length > 1) {
     const rawBrand = params.brand.trim();
@@ -142,9 +186,11 @@ export function validateCandidateImage(
         if (subBrands.length > 0) {
           const hasAnySubBrand = subBrands.some(b => {
             const bNoSpace = b.replace(/[^a-z0-9]/g, '');
+            const bSpaced = b.replace(/([a-z])([0-9a-z])/g, '$1 $2');
             return titleLower.includes(b) ||
               purlLower.includes(b) ||
               murlLower.includes(b) ||
+              titleLower.includes(bSpaced) ||
               (bNoSpace.length > 2 && (titleLower.replace(/[^a-z0-9]/g, '').includes(bNoSpace) || purlLower.includes(bNoSpace)));
           });
 
@@ -165,14 +211,140 @@ export function validateCandidateImage(
         if (!hasBrand) return false;
       }
     }
-    // For generic descriptors (e.g. "Generic Leather"), do not require literal string in title or URL.
-    // Continue checking core tokens, category relevance, and anti-collision guards below.
   }
 
-  // 6. Core tokens matching: The product type/name core nouns must match
+  // 6. Strict anti-collision guards and specific product category requirements:
+  // Watermelon vs bottled water
+  if ((nameLower.includes('watermelon') || nameLower.includes('tikiti')) &&
+      (titleLower.includes('bottled water') || titleLower.includes('water tank') || titleLower.includes('mineral water') || titleLower.includes('drinking water'))) {
+    return false;
+  }
+  if ((nameLower.includes('bottled water') || nameLower.includes('drinking water') || nameLower.includes('mineral water')) &&
+      (titleLower.includes('watermelon') || titleLower.includes('tikiti') || titleLower.includes('water tank') || titleLower.includes('water pump') || titleLower.includes('water heater'))) {
+    return false;
+  }
+
+  // Wheat flour vs maize flour & raw grains
+  if (nameLower.includes('wheat flour') || nameLower.includes('ngano')) {
+    if (titleLower.includes('maize flour') || titleLower.includes('corn flour') || titleLower.includes('cornmeal') || titleLower.includes('ugali') || titleLower.includes('maize meal')) {
+      return false;
+    }
+    // Reject loose unground raw grains or fields when seeking flour
+    if (/\b(wheat berries|wheat grass|wheat crop|wheat field|raw grain|wheat stalk)\b/i.test(titleLower)) {
+      return false;
+    }
+    if (!titleLower.includes('flour') && !titleLower.includes('atta') && !titleLower.includes('unga') && !titleLower.includes('baking') && !purlLower.includes('flour')) {
+      return false;
+    }
+  }
+  if (nameLower.includes('maize flour') || nameLower.includes('corn flour') || nameLower.includes('maize meal') || nameLower.includes('ugali')) {
+    if (titleLower.includes('wheat flour') || titleLower.includes('baking flour') || titleLower.includes('all purpose flour') || titleLower.includes('ngano')) {
+      return false;
+    }
+  }
+
+  // Laptop vs desktop monitors, TVs, and accessories
+  if (nameLower.includes('laptop') || nameLower.includes('notebook')) {
+    if (/\b(desktop monitor|computer monitor|curved monitor|gaming monitor|monitor only|pc monitor|lcd monitor|tv monitor|desktop pc|all-in-one pc|laptop bag|laptop sleeve|laptop case|laptop backpack|laptop stand|laptop skin|sticker|docking station|keyboard cover|laptop charger|power adapter)\b/i.test(titleLower) &&
+        !/\b(touch-screen laptop|gaming laptop|notebook laptop|core i\d|ryzen|chromebook|macbook)\b/i.test(titleLower)) {
+      return false;
+    }
+    if (!titleLower.includes('laptop') && !titleLower.includes('notebook') && !titleLower.includes('macbook') && !titleLower.includes('chromebook') && !purlLower.includes('laptop')) {
+      return false;
+    }
+  }
+
+  // Multimedia speaker system vs headphones / earphones / earbuds / televisions
+  if (nameLower.includes('speaker system') || nameLower.includes('multimedia speaker') || nameLower.includes('speaker') || nameLower.includes('subwoofer')) {
+    if (/\b(headphone|headphones|headset|headsets|earphone|earphones|earbud|earbuds|airpod|airpods|in-ear|over-ear|tv|television)\b/i.test(titleLower)) {
+      return false;
+    }
+    if (!titleLower.includes('speaker') && !titleLower.includes('subwoofer') && !titleLower.includes('soundbar') && !purlLower.includes('speaker')) {
+      return false;
+    }
+  }
+
+  // Water dispenser vs bottled water / water bottles
+  if (nameLower.includes('dispenser') && (nameLower.includes('water') || nameLower.includes('maji'))) {
+    if (/\b(bottled water|water bottle|mineral water|drinking water bottle|watermelon|tikiti)\b/i.test(titleLower) && !titleLower.includes('dispenser')) {
+      return false;
+    }
+    if (!titleLower.includes('dispenser') && !purlLower.includes('dispenser')) {
+      return false;
+    }
+  }
+
+  // TV stand / console vs television screen
+  if (nameLower.includes('tv stand') || nameLower.includes('television stand') || nameLower.includes('tv unit') || nameLower.includes('tv console') || nameLower.includes('entertainment unit')) {
+    if (/\b(smart tv|led tv|oled tv|qled tv|android tv|frameless tv|television set|inch tv|tv screen)\b/i.test(titleLower) && !/\b(stand|console|unit|cabinet|rack|shelf|table|mount)\b/i.test(titleLower)) {
+      return false;
+    }
+    if (!titleLower.includes('stand') && !titleLower.includes('console') && !titleLower.includes('unit') && !titleLower.includes('cabinet') && !titleLower.includes('shelf') && !titleLower.includes('table') && !purlLower.includes('stand')) {
+      return false;
+    }
+  }
+
+  // Adult wellness vs explicit dildos
+  if (nameLower.includes('dildo')) {
+    if (!titleLower.includes('dildo') && !titleLower.includes('massager') && !purlLower.includes('dildo') && !purlLower.includes('massager')) {
+      return false;
+    }
+  } else if (nameLower.includes('adult wellness') || nameLower.includes('sexual wellness')) {
+    if (titleLower.includes('dildo') && !titleLower.includes('wellness') && !titleLower.includes('care')) {
+      return false;
+    }
+  }
+
+  // Formal leather loafers vs athletic running shoes / sneakers
+  if (nameLower.includes('loafer') || (nameLower.includes('classic leather') && !nameLower.includes('reebok'))) {
+    if (/\b(running shoe|running shoes|sneaker|sneakers|athletic shoe|athletic shoes|trainers|cleats|trail running)\b/i.test(titleLower)) {
+      return false;
+    }
+  }
+
+  // Dumbbells
+  if (nameLower.includes('dumbbell')) {
+    if (!titleLower.includes('dumbbell') && !titleLower.includes('dumbbells') && !titleLower.includes('hex') && !purlLower.includes('dumbbell')) {
+      return false;
+    }
+  }
+
+  // Pull-up bar
+  if (nameLower.includes('pull-up') || nameLower.includes('pull up') || nameLower.includes('chin-up')) {
+    if (!titleLower.includes('pull') && !titleLower.includes('chin') && !titleLower.includes('bar') && !purlLower.includes('pull-up')) {
+      return false;
+    }
+  }
+
+  // Treadmill
+  if (nameLower.includes('treadmill')) {
+    if (!titleLower.includes('treadmill') && !purlLower.includes('treadmill')) {
+      return false;
+    }
+  }
+
+  // Yoga mat
+  if (nameLower.includes('yoga mat') || nameLower.includes('exercise mat')) {
+    if (!titleLower.includes('mat') && !titleLower.includes('mkeka') && !purlLower.includes('mat')) {
+      return false;
+    }
+  }
+
+  // Meat / butchery vs pet food
+  if ((nameLower.includes('beef') || nameLower.includes('chicken') || nameLower.includes('meat') || nameLower.includes('nyama')) &&
+      (titleLower.includes('dog food') || titleLower.includes('cat food') || titleLower.includes('pet food') || titleLower.includes('chicken feed') || titleLower.includes('poultry feed'))) {
+    return false;
+  }
+
+  // Underwear vs boxing gear
+  if (nameLower.includes('boxer') && (titleLower.includes('gloves') || titleLower.includes('ring') || titleLower.includes('punching') || titleLower.includes('sparring'))) {
+    return false;
+  }
+
+  // 7. General core tokens matching: The product type/name core nouns must match
   const stopWords = new Set([
     'buy', 'price', 'online', 'kenya', 'in', 'for', 'sale', 'best', 'the', 'and', 'with', 'per',
-    'kg', 'g', 'ml', 'l', 'ltr', 'genuine', 'original', 'cheap', 'latest', 'order', 'shop'
+    'kg', 'g', 'ml', 'l', 'ltr', 'genuine', 'original', 'cheap', 'latest', 'order', 'shop', 'set', 'pack'
   ]);
   const tokens = nameLower
     .replace(/[^a-z0-9]/g, ' ')
@@ -185,28 +357,6 @@ export function validateCandidateImage(
       return titleLower.includes(t) || titleLower.includes(singular) || purlLower.includes(t) || murlLower.includes(t);
     });
     if (!hasMatch) return false;
-  }
-
-  // 7. Strict anti-collision guards:
-  // Watermelon vs bottled water
-  if ((nameLower.includes('watermelon') || nameLower.includes('tikiti')) &&
-      (titleLower.includes('bottled water') || titleLower.includes('water tank') || titleLower.includes('mineral water'))) {
-    return false;
-  }
-  if ((nameLower.includes('bottled water') || nameLower.includes('drinking water')) &&
-      (titleLower.includes('watermelon') || titleLower.includes('tikiti'))) {
-    return false;
-  }
-
-  // Meat / butchery vs pet food
-  if ((nameLower.includes('beef') || nameLower.includes('chicken') || nameLower.includes('meat')) &&
-      (titleLower.includes('dog food') || titleLower.includes('cat food') || titleLower.includes('pet food') || titleLower.includes('chicken feed'))) {
-    return false;
-  }
-
-  // Underwear vs boxing gear
-  if (nameLower.includes('boxer') && (titleLower.includes('gloves') || titleLower.includes('ring') || titleLower.includes('punching'))) {
-    return false;
   }
 
   return true;
@@ -268,23 +418,24 @@ export async function discoverProductPhotograph(
 
     const html = await res.text();
     const matches = [...html.matchAll(/<a[^>]+class="iusc"[^>]*m="([^"]+)"/gi)];
+    let bestCandidateWithThumbnail: DiscoveredImageResult | null = null;
 
     for (const match of matches) {
       try {
         const rawJson = match[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&');
         const data = JSON.parse(rawJson);
-        const murl = data.murl;
+        const rawMurl = typeof data.murl === 'string' ? data.murl.trim() : '';
+        const murl = rawMurl ? encodeURI(rawMurl) : '';
         const title = data.t || data.desc || cleanName;
         const purl = data.purl || '';
 
-        if (validateCandidateImage(murl, title, purl, params)) {
-          let finalImageUrl = murl;
-
+        if (murl && validateCandidateImage(murl, title, purl, params)) {
           // Probe candidate reachability to prevent returning 404 or anti-bot challenge pages
+          let directReachable = false;
           try {
             const probeController = new AbortController();
-            const probeTimeout = setTimeout(() => probeController.abort(), 2000);
-            const probeRes = await fetch(murl, {
+            const probeTimeout = setTimeout(() => probeController.abort(), 3000);
+            let probeRes = await fetch(murl, {
               method: 'HEAD',
               headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -292,42 +443,63 @@ export async function discoverProductPhotograph(
               },
               signal: probeController.signal
             });
+            if (probeRes.status === 405 || probeRes.status === 403) {
+              probeRes = await fetch(murl, {
+                method: 'GET',
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                  'Accept': 'image/*,*/*;q=0.8',
+                  'Range': 'bytes=0-1023'
+                },
+                signal: probeController.signal
+              });
+            }
             clearTimeout(probeTimeout);
             const ct = (probeRes.headers.get('content-type') || '').toLowerCase();
-            if (!probeRes.ok || ct.includes('text/html')) {
-              if (data.turl && typeof data.turl === 'string' && data.turl.startsWith('http')) {
-                finalImageUrl = data.turl;
-              } else {
-                continue;
-              }
+            if ((probeRes.ok || probeRes.status === 206) && ct.startsWith('image/')) {
+              directReachable = true;
             }
           } catch {
-            if (data.turl && typeof data.turl === 'string' && data.turl.startsWith('http')) {
-              finalImageUrl = data.turl;
-            }
+            directReachable = false;
           }
 
-          const result: DiscoveredImageResult = {
-            imageUrl: finalImageUrl,
-            thumbnailUrl: data.turl || finalImageUrl,
-            title,
-            pageUrl: purl,
-            source: extractSourceFromUrl(purl),
-            imageSource: 'discovered'
-          };
-          imageDiscoveryCache.set(cacheKey, { result, timestamp: Date.now() });
-          return result;
+          if (directReachable) {
+            const result: DiscoveredImageResult = {
+              imageUrl: murl,
+              thumbnailUrl: (data.turl && !data.turl.includes('bing.net')) ? data.turl : murl,
+              title,
+              pageUrl: purl,
+              source: extractSourceFromUrl(purl),
+              imageSource: 'discovered'
+            };
+            imageDiscoveryCache.set(cacheKey, { result, timestamp: Date.now() });
+            return result;
+          } else if (!bestCandidateWithThumbnail) {
+            bestCandidateWithThumbnail = {
+              imageUrl: murl,
+              thumbnailUrl: (data.turl && !data.turl.includes('bing.net')) ? data.turl : murl,
+              title,
+              pageUrl: purl,
+              source: extractSourceFromUrl(purl),
+              imageSource: 'discovered'
+            };
+          }
         }
       } catch {
         // Skip parsing failure
       }
     }
 
-    // No valid image found, cache failure to prevent repeated lookups
-    imageDiscoveryCache.set(cacheKey, { result: null, timestamp: Date.now() });
+    if (bestCandidateWithThumbnail) {
+      imageDiscoveryCache.set(cacheKey, { result: bestCandidateWithThumbnail, timestamp: Date.now() });
+      return bestCandidateWithThumbnail;
+    }
+
+    // No valid image found, cache failure briefly (30s) to prevent hammering while allowing timely retries
+    imageDiscoveryCache.set(cacheKey, { result: null, timestamp: Date.now() - CACHE_TTL_MS + (30 * 1000) });
     return null;
   } catch (error) {
-    imageDiscoveryCache.set(cacheKey, { result: null, timestamp: Date.now() });
+    imageDiscoveryCache.set(cacheKey, { result: null, timestamp: Date.now() - CACHE_TTL_MS + (30 * 1000) });
     return null;
   }
 }

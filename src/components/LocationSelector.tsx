@@ -31,22 +31,26 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
   selectedLocation,
   onSelectLocation
 }) => {
+  const kenyaCountry = useMemo(() => {
+    return WORLDWIDE_COUNTRIES.find(c => c.name === 'Kenya') || WORLDWIDE_COUNTRIES[0];
+  }, []);
+
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCountry, setSelectedCountry] = useState<WorldwideCountry | null>(null);
+  const [selectedCountry, setSelectedCountry] = useState<WorldwideCountry | null>(kenyaCountry);
   const [selectedSubdivision, setSelectedSubdivision] = useState<string | null>(null);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
 
   // Reset drill-down on modal open/close
   const handleClose = () => {
-    setSelectedCountry(null);
+    setSelectedCountry(kenyaCountry);
     setSelectedSubdivision(null);
     setSelectedCity(null);
     setSearchQuery('');
     onClose();
   };
 
-  const handleSelectWorldwide = () => {
-    onSelectLocation('');
+  const handleSelectKenya = () => {
+    onSelectLocation('Kenya', { country: 'Kenya' });
     handleClose();
   };
 
@@ -58,7 +62,7 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
     handleClose();
   };
 
-  // Search filter across all countries, subdivisions, cities, and neighborhoods
+  // Search filter across Kenyan 47 counties, towns, estates and areas
   const filteredSearchMatches = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     if (!q || q.length < 2) return [];
@@ -71,14 +75,14 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
       meta: { country?: string; county?: string; town?: string; area?: string };
     }[] = [];
 
-    // Worldwide matches
-    if ('worldwide'.includes(q) || 'global'.includes(q) || 'all'.includes(q)) {
+    // All Kenya matches
+    if ('worldwide'.includes(q) || 'global'.includes(q) || 'all'.includes(q) || 'kenya'.includes(q) || 'national'.includes(q)) {
       matches.push({
-        type: 'World',
-        title: 'Worldwide',
-        subtitle: 'All countries & locations globally',
-        displayStr: '',
-        meta: {}
+        type: 'National (Kenya)',
+        title: '🇰🇪 All Kenya',
+        subtitle: 'National coverage across all 47 counties',
+        displayStr: 'Kenya',
+        meta: { country: 'Kenya' }
       });
     }
 
@@ -204,10 +208,10 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
             </div>
             <div>
               <h3 id="location-modal-title" className="text-base sm:text-lg font-extrabold text-white font-['Space_Grotesk']">
-                Select Location Filter
+                Select Kenyan Location Filter
               </h3>
               <p className="text-xs text-neutral-400">
-                Worldwide → Country → County/State → Town/City → Neighborhood
+                Kenya → County (47 Counties) → Town/City → Neighborhood & Estate
               </p>
             </div>
           </div>
@@ -295,22 +299,22 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
           ) : (
             /* 2. Hierarchical Drilldown Navigation */
             <div className="space-y-4">
-              {/* Quick Actions: Worldwide & Current Active */}
+              {/* Quick Actions: All Kenya & Current Active */}
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={handleSelectWorldwide}
+                  onClick={handleSelectKenya}
                   className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all cursor-pointer ${
-                    !selectedLocation
+                    !selectedLocation || selectedLocation.toLowerCase() === 'kenya'
                       ? 'bg-emerald-500 text-neutral-950 border-emerald-400 shadow-md'
                       : 'bg-neutral-800/60 hover:bg-neutral-800 text-neutral-300 border-neutral-700/80'
                   }`}
                 >
-                  <Globe className="w-3.5 h-3.5" />
-                  <span>🌍 Worldwide (All Locations)</span>
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span>🇰🇪 All Kenya (National Coverage)</span>
                 </button>
 
-                {selectedLocation && (
+                {selectedLocation && selectedLocation.toLowerCase() !== 'kenya' && (
                   <div className="px-3 py-1.5 rounded-xl bg-emerald-950 text-emerald-400 border border-emerald-800/60 text-xs font-bold flex items-center gap-1.5">
                     <Check className="w-3.5 h-3.5" />
                     <span>Current: {selectedLocation}</span>
@@ -319,18 +323,17 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
               </div>
 
               {/* Breadcrumbs if drilled in */}
-              {(selectedCountry || selectedSubdivision || selectedCity) && (
+              {(selectedSubdivision || selectedCity) && (
                 <div className="flex items-center gap-1.5 text-xs text-neutral-400 bg-neutral-950/60 p-2.5 rounded-xl border border-neutral-800 flex-wrap">
                   <button
                     type="button"
                     onClick={() => {
-                      setSelectedCountry(null);
                       setSelectedSubdivision(null);
                       setSelectedCity(null);
                     }}
                     className="text-emerald-400 hover:underline font-bold flex items-center gap-1 cursor-pointer"
                   >
-                    <ArrowLeft className="w-3 h-3" /> All Countries
+                    <ArrowLeft className="w-3 h-3" /> All 47 Counties
                   </button>
 
                   {selectedCountry && (
@@ -607,13 +610,13 @@ export const LocationSelector: React.FC<LocationSelectorProps> = ({
 
         {/* Footer */}
         <div className="p-4 border-t border-neutral-800 bg-neutral-950/60 flex items-center justify-between text-xs text-neutral-400">
-          <span>Active: <strong className="text-white">{selectedLocation || 'Worldwide (All Locations)'}</strong></span>
+          <span>Active: <strong className="text-white">{(!selectedLocation || selectedLocation.toLowerCase() === 'kenya') ? 'All Kenya (National)' : selectedLocation}</strong></span>
           <button
             type="button"
-            onClick={handleSelectWorldwide}
+            onClick={handleSelectKenya}
             className="text-emerald-400 hover:underline font-semibold cursor-pointer"
           >
-            Reset to Worldwide
+            Reset to All Kenya
           </button>
         </div>
       </div>

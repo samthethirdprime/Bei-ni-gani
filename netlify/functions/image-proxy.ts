@@ -50,7 +50,7 @@ export async function handler(event: any) {
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 6000);
+    const timeout = setTimeout(() => controller.abort(), 8000);
 
     const imageRes = await fetch(targetUrl, {
       headers: {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Check, 
   MapPin, 
@@ -33,25 +33,26 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const imageUrl = getProductImageUrl(product);
   const [currentImgSrc, setCurrentImgSrc] = useState<string | null>(imageUrl);
   const [imageFailed, setImageFailed] = useState(false);
-  const [hasTriedProxy, setHasTriedProxy] = useState(false);
   const [hasTriedDiscovery, setHasTriedDiscovery] = useState(false);
   const [imgSource, setImgSource] = useState<'retailer' | 'fallback' | 'discovered' | 'generic' | null>(
     imageUrl ? (isFallbackProductImage(imageUrl) ? 'fallback' : (product.imageSource || 'retailer')) : null
   );
+  const triedUrlsRef = useRef<Set<string>>(new Set());
   const [isConfirming, setIsConfirming] = useState(false);
   const [justConfirmed, setJustConfirmed] = useState(false);
 
   // Sync image source when imageUrl changes, and trigger async discovery only if no image exists
   useEffect(() => {
+    triedUrlsRef.current.clear();
     setCurrentImgSrc(imageUrl);
     setImageFailed(false);
-    setHasTriedProxy(false);
     setHasTriedDiscovery(false);
     setImgSource(imageUrl ? (isFallbackProductImage(imageUrl) ? 'fallback' : (product.imageSource || 'retailer')) : null);
 
-    // Dynamic discovery: ONLY run if no retailer image and no local photographic fallback
+    // Dynamic discovery: Run if no retailer image and no local photographic fallback
     if (!imageUrl && product?.name) {
       let isCancelled = false;
+      const currentProductId = product.id;
       setHasTriedDiscovery(true);
       discoverProductImageAsync({
         name: product.name,
@@ -60,7 +61,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         sizeOrQuantity: product.sizeOrQuantity,
         subcategory: product.subcategory
       }).then(discoveredUrl => {
-        if (!isCancelled && discoveredUrl) {
+        if (!isCancelled && product?.id === currentProductId && discoveredUrl) {
           setCurrentImgSrc(discoveredUrl);
           setImgSource('discovered');
           setImageFailed(false);
@@ -73,26 +74,38 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   }, [imageUrl, product?.id, product?.name, product?.brand, product?.sizeOrQuantity, product?.category]);
 
   const handleImageError = () => {
-    // 1. If direct external image failed, automatically fall back to local image proxy first
-    if (!hasTriedProxy && currentImgSrc && (currentImgSrc.startsWith('http://') || currentImgSrc.startsWith('https://')) && !currentImgSrc.startsWith('/api/image-proxy')) {
-      setHasTriedProxy(true);
-      setCurrentImgSrc(`/api/image-proxy?url=${encodeURIComponent(currentImgSrc)}`);
-      return;
+    const failedSrc = currentImgSrc;
+    if (failedSrc) {
+      triedUrlsRef.current.add(failedSrc);
     }
 
-    // 2. If proxy or non-proxy image failed, check if curated local photographic fallback exists
-    if (currentImgSrc && !isFallbackProductImage(currentImgSrc)) {
-      const fallback = getGenericProductImage(product);
-      if (fallback) {
-        setCurrentImgSrc(fallback);
-        setImgSource('fallback');
+    // 1. Direct external image failed -> try proxy once
+    if (
+      failedSrc &&
+      (failedSrc.startsWith('http://') || failedSrc.startsWith('https://')) &&
+      !failedSrc.startsWith('/api/image-proxy')
+    ) {
+      const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(failedSrc)}`;
+      if (!triedUrlsRef.current.has(proxyUrl)) {
+        triedUrlsRef.current.add(proxyUrl);
+        setCurrentImgSrc(proxyUrl);
         return;
       }
     }
 
-    // 3. If no local fallback exists and we haven't tried dynamic discovery yet:
-    if (!hasTriedDiscovery && product?.name && imgSource !== 'discovered') {
+    // 2. Curated local photographic fallback
+    const fallback = getGenericProductImage(product);
+    if (fallback && !triedUrlsRef.current.has(fallback)) {
+      triedUrlsRef.current.add(fallback);
+      setCurrentImgSrc(fallback);
+      setImgSource('fallback');
+      return;
+    }
+
+    // 3. Dynamic discovery (never blocked by failed initial image)
+    if (!hasTriedDiscovery && product?.name) {
       setHasTriedDiscovery(true);
+      const currentProductId = product.id;
       discoverProductImageAsync({
         name: product.name,
         category: product.category,
@@ -100,10 +113,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         sizeOrQuantity: product.sizeOrQuantity,
         subcategory: product.subcategory
       }).then(discoveredUrl => {
-        if (discoveredUrl) {
+        if (product?.id === currentProductId && discoveredUrl && !triedUrlsRef.current.has(discoveredUrl)) {
           setCurrentImgSrc(discoveredUrl);
           setImgSource('discovered');
-          setHasTriedProxy(false);
           setImageFailed(false);
         } else {
           setImageFailed(true);
@@ -114,7 +126,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       return;
     }
 
-    // 4. All fallback layers exhausted -> neutral package placeholder
+    // 4. All layers exhausted -> neutral package placeholder
     setImageFailed(true);
   };
 
@@ -197,13 +209,21 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/80 flex items-center gap-1">
                   <ShieldCheck className="w-3 h-3" /> Official
                 </span>
-              ) : product.verified || product.isRealtimeDiscovered ? (
+              ) : (product.priceType === 'COMMUNITY_REPORT' || product.isCommunityAdded || product.isCommunityCreated) ? (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-950 text-blue-300 border border-blue-800/80 flex items-center gap-1">
+                  <Users className="w-3 h-3" /> Community
+                </span>
+              ) : (product.verified && !product.isDemo && product.acquisitionMethod !== 'search_snippet') ? (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-950 text-teal-300 border border-teal-800/80 flex items-center gap-1">
                   <Sparkles className="w-3 h-3" /> Verified Live
                 </span>
+              ) : (product.isRealtimeDiscovered || product.acquisitionMethod === 'search_snippet') ? (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-800/80 flex items-center gap-1" title="Price found in online retailer listing; unconfirmed by direct 1P checkout">
+                  <ExternalLink className="w-3 h-3" /> Online — Unverified
+                </span>
               ) : (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400 border border-neutral-700/60">
-                  Community
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400 border border-neutral-700/60 flex items-center gap-1">
+                  <Package className="w-3 h-3" /> Reference Price
                 </span>
               )}
               {product.vendors && product.vendors.length > 1 && (

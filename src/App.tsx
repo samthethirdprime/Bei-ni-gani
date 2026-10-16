@@ -15,7 +15,8 @@ import {
   RefreshCw,
   Loader2,
   Layers,
-  MapPin
+  MapPin,
+  Globe
 } from 'lucide-react';
 import { Product, CommunityReport, CategoryKey, SearchQueryAnalysis } from './types';
 import { INITIAL_PRODUCTS } from './services/catalogData';
@@ -47,11 +48,47 @@ import { LocationSelector } from './components/LocationSelector';
 
 export default function App() {
   // State
+  // Normalize initial location: default Kenya, normalize any persisted 'worldwide' / 'global'
+  const getInitialLocation = (): string => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlLoc = urlParams.get('location') || urlParams.get('county');
+      if (urlLoc && urlLoc.trim()) {
+        const clean = urlLoc.trim();
+        if (['worldwide', 'global', 'all', 'all locations'].includes(clean.toLowerCase())) {
+          return 'Kenya';
+        }
+        return clean;
+      }
+      const saved = localStorage.getItem('bei_gani_location');
+      if (saved && saved.trim()) {
+        const clean = saved.trim();
+        if (['worldwide', 'global', 'all', 'all locations'].includes(clean.toLowerCase())) {
+          localStorage.setItem('bei_gani_location', 'Kenya');
+          return 'Kenya';
+        }
+        return clean;
+      }
+    } catch {}
+    return 'Kenya';
+  };
+
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey>('all');
-  const [selectedLocation, setSelectedLocation] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState<string>(getInitialLocation);
   const [showLocationModal, setShowLocationModal] = useState(false);
+
+  const handleSelectLocation = (locStr: string) => {
+    const raw = (locStr || '').trim();
+    const normalized = (!raw || ['worldwide', 'global', 'all', 'all locations'].includes(raw.toLowerCase()))
+      ? 'Kenya'
+      : raw;
+    setSelectedLocation(normalized);
+    try {
+      localStorage.setItem('bei_gani_location', normalized);
+    } catch {}
+  };
   
   // Real-time Discovery State
   const [isLiveSearching, setIsLiveSearching] = useState(false);
@@ -278,9 +315,11 @@ export default function App() {
 
   // Partition results by source type so demo data NEVER impersonates live data
   const categorizedResults = useMemo(() => {
-    const live: Product[] = [];
+    const verifiedLive: Product[] = [];
+    const onlineUnverified: Product[] = [];
     const official: Product[] = [];
     const community: Product[] = [];
+    const reference: Product[] = [];
     const demo: Product[] = [];
 
     displayedResults.forEach(p => {
@@ -288,16 +327,21 @@ export default function App() {
         demo.push(p);
       } else if (p.priceType === 'VERIFIED_OFFICIAL') {
         official.push(p);
-      } else if (p.isRealtimeDiscovered || (p.verified && !p.isDemo && p.priceType !== 'COMMUNITY_REPORT')) {
-        live.push(p);
       } else if (p.priceType === 'COMMUNITY_REPORT' || p.isCommunityAdded || p.isCommunityCreated) {
         community.push(p);
+      } else if (p.isRealtimeDiscovered && (!p.verified || p.acquisitionMethod === 'search_snippet')) {
+        // Discovered online via web search engine, but unverified snippet
+        onlineUnverified.push(p);
+      } else if (p.verified && (p.isRealtimeDiscovered || p.acquisitionMethod === 'direct_webpage' || p.acquisitionMethod === 'direct_api')) {
+        // Verified live discovery
+        verifiedLive.push(p);
       } else {
-        demo.push(p);
+        // Internal catalogue reference benchmarks
+        reference.push(p);
       }
     });
 
-    return { live, official, community, demo };
+    return { verifiedLive, onlineUnverified, official, community, reference, demo };
   }, [displayedResults]);
 
   // Perform Live Real-time Price Discovery across Kenyan sources
@@ -325,7 +369,8 @@ export default function App() {
         return;
       }
 
-      const hasProducts = result.verified && ((result.products && result.products.length > 0) || result.product);
+      // Check whether products were returned, regardless of verified-price status
+      const hasProducts = Boolean((result.products && result.products.length > 0) || result.product);
       if (hasProducts) {
         const discoveredList: Product[] = result.products && result.products.length > 0
           ? result.products
@@ -349,7 +394,11 @@ export default function App() {
 
         setIsLiveSearching(false);
         setLiveSearchFailed(false);
-        showToast(`✓ Verified live prices found across ${discoveredList.length} product match${discoveredList.length === 1 ? '' : 'es'}!`);
+        if (result.verified) {
+          showToast(`✓ Verified live prices found across ${discoveredList.length} product match${discoveredList.length === 1 ? '' : 'es'}!`);
+        } else {
+          showToast(`⚡ Discovered online prices for ${discoveredList.length} product${discoveredList.length === 1 ? '' : 's'} (unverified search snippets)`);
+        }
       } else {
         // Late-arriving or empty response:
         // Prevent an empty response from clearing valid results rendered by a previous, successful request
@@ -363,7 +412,7 @@ export default function App() {
           });
           if (!hasExistingMatches) {
             setLiveSearchFailed(true);
-            setLiveSearchFailedMessage(result.message || "No verified current price found.");
+            setLiveSearchFailedMessage(result.message || "No current price found for this item in Kenya.");
           } else {
             setLiveSearchFailed(false);
           }
@@ -546,7 +595,7 @@ export default function App() {
         selectedLocation={selectedLocation}
         selectedCounty={selectedLocation}
         onOpenLocationModal={() => setShowLocationModal(true)}
-        onSelectCounty={setSelectedLocation}
+        onSelectCounty={handleSelectLocation}
         productsCount={products.length}
       />
 
@@ -615,7 +664,7 @@ export default function App() {
             )}
 
             {/* Clickable Location Badge */}
-            {selectedLocation ? (
+            {selectedLocation && selectedLocation.toLowerCase() !== 'kenya' ? (
               <button
                 type="button"
                 onClick={() => setShowLocationModal(true)}
@@ -630,9 +679,9 @@ export default function App() {
                   className="text-emerald-400 hover:text-white ml-0.5 px-1 rounded hover:bg-emerald-800/60 cursor-pointer"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setSelectedLocation('');
+                    handleSelectLocation('Kenya');
                   }}
-                  title="Clear location filter"
+                  title="Reset to All Kenya"
                 >
                   ✕
                 </span>
@@ -642,22 +691,22 @@ export default function App() {
                 type="button"
                 onClick={() => setShowLocationModal(true)}
                 className="bg-neutral-900/90 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 hover:border-neutral-700 px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="Filter by Country, County, City or Area"
+                title="Filter by Kenyan County, City or Area"
               >
                 <MapPin className="w-3 h-3 text-emerald-400" />
-                <span>Worldwide</span>
+                <span>Kenya (All 47 Counties)</span>
               </button>
             )}
           </div>
 
-          {(searchQuery || selectedCategory !== 'all' || selectedLocation) && (
+          {(searchQuery || selectedCategory !== 'all' || (selectedLocation && selectedLocation.toLowerCase() !== 'kenya')) && (
             <button
               type="button"
               onClick={() => {
                 searchRequestIdRef.current++;
                 setSearchQuery('');
                 setSelectedCategory('all');
-                setSelectedLocation('');
+                handleSelectLocation('Kenya');
                 setLiveSearchFailed(false);
               }}
               className="text-emerald-400 hover:text-emerald-300 font-semibold text-xs cursor-pointer"
@@ -680,7 +729,7 @@ export default function App() {
         )}
 
         {/* Honest Live Search Status Notification when 0 live results found */}
-        {searchQuery.trim().length >= 2 && !isLiveSearching && liveSearchFailed && categorizedResults.live.length === 0 && (
+        {searchQuery.trim().length >= 2 && !isLiveSearching && liveSearchFailed && categorizedResults.verifiedLive.length === 0 && categorizedResults.onlineUnverified.length === 0 && (
           <div className="bg-amber-950/30 border border-amber-800/60 rounded-2xl p-4 text-xs space-y-2">
             <div className="flex items-center gap-2 text-amber-300 font-bold">
               <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
@@ -698,10 +747,10 @@ export default function App() {
             requestedLocation={selectedLocation || queryAnalysis.detectedLocation || ''}
             itemQuery={queryAnalysis.itemQuery}
             onSelectNearby={(area) => {
-              setSelectedLocation(area);
+              handleSelectLocation(area);
             }}
             onClearLocation={() => {
-              setSelectedLocation('');
+              handleSelectLocation('Kenya');
               setSearchQuery(queryAnalysis.itemQuery);
             }}
             onReportPrice={() => {
@@ -750,15 +799,15 @@ export default function App() {
         {/* Grouped Product Results when Search Query is Active */}
         {searchQuery.trim().length >= 2 && displayedResults.length > 0 ? (
           <div className="space-y-6">
-            {/* 1. Live Discovered Results */}
-            {categorizedResults.live.length > 0 && (
+            {/* 1. Verified Live Retailer Results */}
+            {categorizedResults.verifiedLive.length > 0 && (
               <section className="space-y-3">
                 <div className="flex items-center gap-2 text-xs font-bold text-teal-400 uppercase tracking-wider">
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>Live Discovered External Results ({categorizedResults.live.length})</span>
+                  <span>Verified Live Retailer Prices ({categorizedResults.verifiedLive.length})</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  {categorizedResults.live.map((product) => (
+                  {categorizedResults.verifiedLive.map((product) => (
                     <ProductCard
                       key={product.id}
                       product={product}
@@ -771,7 +820,33 @@ export default function App() {
               </section>
             )}
 
-            {/* 2. Official Government / Gazette Tariffs */}
+            {/* 2. Discovered Online — Unverified Search Snippets */}
+            {categorizedResults.onlineUnverified.length > 0 && (
+              <section className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-bold text-cyan-400 uppercase tracking-wider">
+                    <Globe className="w-3.5 h-3.5" />
+                    <span>Price Found Online — Unverified ({categorizedResults.onlineUnverified.length})</span>
+                  </div>
+                  <span className="text-[11px] text-neutral-400">
+                    Search snippets from Kenyan retailers • Subject to store confirmation
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {categorizedResults.onlineUnverified.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      onSelect={handleSelectProduct}
+                      onQuickConfirm={handleQuickConfirm}
+                      onOpenReportModal={(p) => setIssueModalProduct({ product: p, mode: 'report' })}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* 3. Official Government / Gazette Tariffs */}
             {categorizedResults.official.length > 0 && (
               <section className="space-y-3">
                 <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 uppercase tracking-wider">
@@ -792,7 +867,7 @@ export default function App() {
               </section>
             )}
 
-            {/* 3. Community Shopper Reports */}
+            {/* 4. Community Shopper Reports */}
             {categorizedResults.community.length > 0 && (
               <section className="space-y-3">
                 <div className="flex items-center gap-2 text-xs font-bold text-blue-400 uppercase tracking-wider">
@@ -801,6 +876,32 @@ export default function App() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   {categorizedResults.community.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      onSelect={handleSelectProduct}
+                      onQuickConfirm={handleQuickConfirm}
+                      onOpenReportModal={(p) => setIssueModalProduct({ product: p, mode: 'report' })}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* 5. Reference Catalogue Benchmarks */}
+            {categorizedResults.reference.length > 0 && (
+              <section className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-bold text-neutral-400 uppercase tracking-wider">
+                    <Store className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Reference Catalogue Prices ({categorizedResults.reference.length})</span>
+                  </div>
+                  <span className="text-[11px] text-neutral-500">
+                    Standard Kenyan market benchmarks
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {categorizedResults.reference.map((product) => (
                     <ProductCard
                       key={product.id}
                       product={product}
@@ -989,7 +1090,7 @@ export default function App() {
         onClose={() => setShowLocationModal(false)}
         selectedLocation={selectedLocation}
         onSelectLocation={(locStr) => {
-          setSelectedLocation(locStr);
+          handleSelectLocation(locStr);
         }}
       />
     </div>

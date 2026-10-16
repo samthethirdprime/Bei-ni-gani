@@ -139,6 +139,11 @@ export function extractRawImageUrl(raw: unknown): string | null {
     return null;
   }
 
+  // Reject internal routes, dynamic OpenGraph HTML routes without image extension
+  if (/\b(opengraph-image|open-graph-image|twitter-image)\b/i.test(str) && !/\.(jpe?g|png|webp|avif|gif)(\?|$)/i.test(str)) {
+    return null;
+  }
+
   // Handle local proxy URLs or generic local assets e.g. /api/image-proxy?url=..., /generic-images/...
   if (str.startsWith('/api/image-proxy') || str.startsWith('/generic-images/')) {
     return str;
@@ -196,10 +201,14 @@ export function formatSearchResponse(
     const clusters = new Map<string, NormalizedPriceResult[]>();
 
     for (const item of normalizedItems) {
-      // Normalize product name to cluster key
+      // Normalize product name to cluster key with size/unit/storage variant preservation
       const cleanName = item.name.toLowerCase().replace(/[^a-z0-9]/g, ' ').trim();
-      const tokens = cleanName.split(/\s+/).filter(t => t.length > 2).slice(0, 4);
-      const clusterKey = tokens.length > 0 ? tokens.join('-') : 'discovered-item';
+      const tokens = cleanName.split(/\s+/).filter(t => t.length > 2).slice(0, 5);
+      const sizeMatch = item.name.match(/\b\d+(?:\.\d+)?\s*(?:kg|g|litre|litres|l|ml|pack|pair|pieces|seater|kg refill)\b/i)?.[0] || item.unit || '';
+      const cleanSize = sizeMatch.toLowerCase().replace(/\s+/g, '');
+      const storageMatch = item.name.match(/\b(32|64|128|256|512)\s*(?:gb|gig)\b/i)?.[0] || '';
+      const cleanStorage = storageMatch.toLowerCase().replace(/\s+/g, '');
+      const clusterKey = `${tokens.length > 0 ? tokens.join('-') : 'discovered-item'}-${cleanSize || cleanStorage}`;
 
       if (!clusters.has(clusterKey)) {
         clusters.set(clusterKey, []);
@@ -217,14 +226,15 @@ export function formatSearchResponse(
       const maxPrice = prices.length > 0 ? Math.max(...prices) : rep.price;
       const typicalPrice = prices.length > 0 ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : rep.price;
 
-      const hasGenuineImage = Boolean(validImage && !validImage.startsWith('/product-photos/') && !validImage.startsWith('/generic-images/'));
+      const isProductVerified = items.some(it => it.isVerified && it.acquisitionMethod !== 'search_snippet');
+      const hasGenuineImage = Boolean(validImage && typeof validImage === 'string' && !validImage.startsWith('/product-photos/') && !validImage.startsWith('/generic-images/'));
       const resolvedProductImage = hasGenuineImage ? validImage : undefined;
       const productImageSource: 'retailer' | 'fallback' = hasGenuineImage ? 'retailer' : 'fallback';
 
       return {
         id: `discovered-${clusterKey}-${pIdx}-${Date.now()}`,
         name: rep.name || query,
-        aliases: [],
+        aliases: Array.from(new Set([query.toLowerCase(), (rep.name || '').toLowerCase(), (rep.name || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').trim()])).filter(Boolean),
         category: rep.category || category || 'general',
         sizeOrQuantity: rep.unit || '1 unit',
         unit: rep.unit || 'unit',
@@ -238,6 +248,7 @@ export function formatSearchResponse(
           : (rep.sourceType === 'community' ? 'COMMUNITY_REPORT' : 'MARKET_RETAIL'),
         county: rep.county || targetLocation,
         town: rep.location || targetLocation,
+        country: 'Kenya',
         retailerOrSource: Array.from(new Set(items.map(i => i.vendor))).slice(0, 3).join(', '),
         dateCollected: 'Live Discovery',
         reportsCount: items.length,
@@ -245,9 +256,12 @@ export function formatSearchResponse(
         outdatesCount: 0,
         flaggedCount: 0,
         sourceUrl: rep.url || rep.sourceUrl,
-        description: `Verified prices retrieved across ${Array.from(new Set(items.map(i => i.vendor))).length} Kenyan sources. Lowest: KSh ${minPrice.toLocaleString()} | Highest: KSh ${maxPrice.toLocaleString()}.`,
+        description: isProductVerified
+          ? `Verified prices retrieved across ${Array.from(new Set(items.map(i => i.vendor))).length} Kenyan sources. Lowest: KSh ${minPrice.toLocaleString()} | Highest: KSh ${maxPrice.toLocaleString()}.`
+          : `Discovered search snippet index across ${Array.from(new Set(items.map(i => i.vendor))).length} Kenyan sources. Lowest: KSh ${minPrice.toLocaleString()} | Highest: KSh ${maxPrice.toLocaleString()}. Unverified snippet: check seller site for stock & final price.`,
         isRealtimeDiscovered: true,
-        verified: true,
+        acquisitionMethod: rep.acquisitionMethod || (items.some(i => i.acquisitionMethod === 'direct_webpage') ? 'direct_webpage' : 'search_snippet'),
+        verified: isProductVerified,
         isDemo: false,
         vendors: items.map((it, idx) => {
           const itemImg = extractRawImageUrl(it.image || (it as any).imageUrl);
@@ -256,8 +270,10 @@ export function formatSearchResponse(
             id: `v-${idx}-${Date.now()}`,
             vendorName: it.vendor,
             price: it.price,
+            currency: 'KES',
             unit: it.unit || 'unit',
             location: it.location || targetLocation,
+            country: 'Kenya',
             sourceType: it.sourceType === 'community'
               ? 'COMMUNITY'
               : (it.sourceType === 'official' ? 'OFFICIAL' : 'ONLINE_RETAILER'),
@@ -285,7 +301,7 @@ export function formatSearchResponse(
     });
 
     return {
-      verified: true,
+      verified: products.some(p => p.verified),
       hasLiveResults: true,
       product: products[0] || null,
       products: products,

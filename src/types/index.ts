@@ -106,6 +106,7 @@ export interface Product {
   isCommunityAdded?: boolean;
   isCommunityCreated?: boolean;
   isRealtimeDiscovered?: boolean;
+  acquisitionMethod?: AcquisitionMethod;
   isDemo?: boolean;
   verified?: boolean;
   vendors?: VendorPrice[];

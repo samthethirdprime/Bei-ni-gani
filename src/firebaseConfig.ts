@@ -17,8 +17,16 @@ const env: Record<string, string | undefined> = (typeof import.meta !== 'undefin
   ? (import.meta as any).env
   : (typeof process !== 'undefined' && process.env ? (process.env as Record<string, string | undefined>) : {});
 
-const projectId = defaultAppletConfig.projectId || (env.VITE_FIREBASE_PROJECT_ID as string) || 'bei-gani';
-const configuredDbId = (defaultAppletConfig as any).firestoreDatabaseId || (env.VITE_FIREBASE_FIRESTORE_DATABASE_ID as string) || '(default)';
+const projectId = (defaultAppletConfig?.projectId && defaultAppletConfig.projectId !== 'bei-gani')
+  ? defaultAppletConfig.projectId
+  : (env.VITE_FIREBASE_PROJECT_ID && env.VITE_FIREBASE_PROJECT_ID !== 'bei-gani'
+      ? env.VITE_FIREBASE_PROJECT_ID
+      : 'gen-lang-client-0985627508');
+
+const rawDbId = (defaultAppletConfig as any)?.firestoreDatabaseId || (env.VITE_FIREBASE_FIRESTORE_DATABASE_ID as string);
+const configuredDbId = (rawDbId && rawDbId !== '(default)')
+  ? rawDbId
+  : 'ai-studio-55344e79-4dac-4650-9c91-1717a9196266';
 
 const firebaseConfig: AppFirebaseConfig = {
   apiKey: defaultAppletConfig.apiKey || (env.VITE_FIREBASE_API_KEY as string) || '',
@@ -32,9 +40,7 @@ const firebaseConfig: AppFirebaseConfig = {
 
 export const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
 
-export const db: Firestore = (!configuredDbId || configuredDbId === '(default)')
-  ? getFirestore(app)
-  : getFirestore(app, configuredDbId);
+export const db: Firestore = getFirestore(app, configuredDbId);
 export const auth: Auth = getAuth(app);
 
 // Google Workspace Scopes

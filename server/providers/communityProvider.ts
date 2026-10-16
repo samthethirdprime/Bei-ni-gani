@@ -12,8 +12,12 @@ try {
     const raw = fs.readFileSync(configPath, 'utf-8');
     const firebaseConfig = JSON.parse(raw);
     const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-    const dbId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || firebaseConfig.firestoreDatabaseId;
-    db = (!dbId || dbId === '(default)') ? getFirestore(app) : getFirestore(app, dbId);
+    const dbId = (firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)')
+      ? firebaseConfig.firestoreDatabaseId
+      : (process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID && process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID !== '(default)'
+          ? process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID
+          : 'ai-studio-55344e79-4dac-4650-9c91-1717a9196266');
+    db = getFirestore(app, dbId);
   }
 } catch (e) {
   console.warn('[CommunityProvider] Firebase init warning:', e);
@@ -47,9 +51,41 @@ export class CommunityProvider implements SearchProvider {
     }
 
     try {
-      // Query community submissions from Firestore
+      // Query community submissions from Firestore with strict timeout guard and no unhandled background rejections
       const reportsRef = collection(db, 'reports');
-      const qSnap = await getDocs(firestoreQuery(reportsRef, limit(100)));
+      let timeoutHandle: any;
+      const timeoutPromise = new Promise<null>((resolve) => {
+        timeoutHandle = setTimeout(() => resolve(null), 1200);
+        if (timeoutHandle && timeoutHandle.unref) timeoutHandle.unref();
+      });
+
+      const docsPromise = getDocs(firestoreQuery(reportsRef, limit(100))).catch((err) => {
+        console.warn('[CommunityProvider] Firestore getDocs note:', err?.message || err);
+        return null;
+      });
+
+      const qSnap = await Promise.race([
+        docsPromise,
+        timeoutPromise
+      ]).finally(() => {
+        if (timeoutHandle) clearTimeout(timeoutHandle);
+      });
+
+      if (!qSnap) {
+        return {
+          providerId: this.id,
+          providerName: this.name,
+          items: [],
+          status: {
+            providerId: this.id,
+            providerName: this.name,
+            status: 'failed',
+            itemCount: 0,
+            durationMs: Date.now() - startTime,
+            message: 'Community reports query timed out or was unavailable'
+          }
+        };
+      }
 
       qSnap.forEach(docSnap => {
         const data = docSnap.data();
@@ -92,8 +128,8 @@ export class CommunityProvider implements SearchProvider {
           county: data.county,
           retrievedAt: new Date().toISOString(),
           timestamp: data.createdAt || data.purchaseDate || new Date().toISOString(),
-          isVerified: true,
-          notes: data.notes || 'Verified by community shopper in Kenya',
+          isVerified: Boolean(data.verified),
+          notes: data.notes || 'Community report submitted by shopper in Kenya',
           unit: data.unit || 'unit'
         });
       });

@@ -1,33 +1,96 @@
 import { Product, SearchQueryAnalysis, VendorPrice } from '../types';
-import { matchesStrictLocation } from './locationService';
+import { matchesStrictLocation, isKenyanProvenance } from './locationService';
 import { connectorRegistry } from './connectors/connectorRegistry';
 import { GroupedProductComparison } from './connectors/types';
 
 // Comprehensive Worldwide & Kenyan locations dictionary
 export const WORLDWIDE_LOCATIONS: { [key: string]: { country: string; county: string; town?: string } } = {
-  // Kenyan Hubs & 47 Counties
-  'rongai': { country: 'Kenya', county: 'Kajiado', town: 'Ongata Rongai' },
-  'ongata rongai': { country: 'Kenya', county: 'Kajiado', town: 'Ongata Rongai' },
-  'nairobi': { country: 'Kenya', county: 'Nairobi', town: 'Nairobi' },
+  // All 47 Counties of Kenya & Key Towns/Estates
   'mombasa': { country: 'Kenya', county: 'Mombasa', town: 'Mombasa' },
-  'kisumu': { country: 'Kenya', county: 'Kisumu', town: 'Kisumu' },
-  'nakuru': { country: 'Kenya', county: 'Nakuru', town: 'Nakuru' },
-  'eldoret': { country: 'Kenya', county: 'Uasin Gishu', town: 'Eldoret' },
-  'thika': { country: 'Kenya', county: 'Kiambu', town: 'Thika' },
+  'kwale': { country: 'Kenya', county: 'Kwale', town: 'Kwale' },
+  'kilifi': { country: 'Kenya', county: 'Kilifi', town: 'Kilifi' },
+  'tana river': { country: 'Kenya', county: 'Tana River', town: 'Hola' },
+  'lamu': { country: 'Kenya', county: 'Lamu', town: 'Lamu' },
+  'taita-taveta': { country: 'Kenya', county: 'Taita-Taveta', town: 'Voi' },
+  'taita taveta': { country: 'Kenya', county: 'Taita-Taveta', town: 'Voi' },
+  'voi': { country: 'Kenya', county: 'Taita-Taveta', town: 'Voi' },
+  'garissa': { country: 'Kenya', county: 'Garissa', town: 'Garissa' },
+  'wajir': { country: 'Kenya', county: 'Wajir', town: 'Wajir' },
+  'mandera': { country: 'Kenya', county: 'Mandera', town: 'Mandera' },
+  'marsabit': { country: 'Kenya', county: 'Marsabit', town: 'Marsabit' },
+  'isiolo': { country: 'Kenya', county: 'Isiolo', town: 'Isiolo' },
+  'meru': { country: 'Kenya', county: 'Meru', town: 'Meru' },
+  'tharaka-nithi': { country: 'Kenya', county: 'Tharaka-Nithi', town: 'Chuka' },
+  'tharaka nithi': { country: 'Kenya', county: 'Tharaka-Nithi', town: 'Chuka' },
+  'chuka': { country: 'Kenya', county: 'Tharaka-Nithi', town: 'Chuka' },
+  'embu': { country: 'Kenya', county: 'Embu', town: 'Embu' },
+  'kitui': { country: 'Kenya', county: 'Kitui', town: 'Kitui' },
+  'machakos': { country: 'Kenya', county: 'Machakos', town: 'Machakos' },
+  'makueni': { country: 'Kenya', county: 'Makueni', town: 'Wote' },
+  'wote': { country: 'Kenya', county: 'Makueni', town: 'Wote' },
+  'nyandarua': { country: 'Kenya', county: 'Nyandarua', town: 'Ol Kalou' },
+  'ol kalou': { country: 'Kenya', county: 'Nyandarua', town: 'Ol Kalou' },
+  'nyeri': { country: 'Kenya', county: 'Nyeri', town: 'Nyeri' },
+  'kirinyaga': { country: 'Kenya', county: 'Kirinyaga', town: 'Kerugoya' },
+  'kerugoya': { country: 'Kenya', county: 'Kirinyaga', town: 'Kerugoya' },
+  'murang\'a': { country: 'Kenya', county: 'Murang\'a', town: 'Murang\'a' },
+  'muranga': { country: 'Kenya', county: 'Murang\'a', town: 'Murang\'a' },
   'kiambu': { country: 'Kenya', county: 'Kiambu', town: 'Kiambu' },
+  'thika': { country: 'Kenya', county: 'Kiambu', town: 'Thika' },
   'ruaka': { country: 'Kenya', county: 'Kiambu', town: 'Ruaka' },
   'ruiru': { country: 'Kenya', county: 'Kiambu', town: 'Ruiru' },
-  'machakos': { country: 'Kenya', county: 'Machakos', town: 'Machakos' },
+  'kikuyu': { country: 'Kenya', county: 'Kiambu', town: 'Kikuyu' },
+  'turkana': { country: 'Kenya', county: 'Turkana', town: 'Lodwar' },
+  'lodwar': { country: 'Kenya', county: 'Turkana', town: 'Lodwar' },
+  'west pokot': { country: 'Kenya', county: 'West Pokot', town: 'Kapenguria' },
+  'kapenguria': { country: 'Kenya', county: 'West Pokot', town: 'Kapenguria' },
+  'samburu': { country: 'Kenya', county: 'Samburu', town: 'Maralal' },
+  'maralal': { country: 'Kenya', county: 'Samburu', town: 'Maralal' },
+  'trans-nzoia': { country: 'Kenya', county: 'Trans-Nzoia', town: 'Kitale' },
+  'trans nzoia': { country: 'Kenya', county: 'Trans-Nzoia', town: 'Kitale' },
+  'kitale': { country: 'Kenya', county: 'Trans-Nzoia', town: 'Kitale' },
+  'uasin gishu': { country: 'Kenya', county: 'Uasin Gishu', town: 'Eldoret' },
+  'eldoret': { country: 'Kenya', county: 'Uasin Gishu', town: 'Eldoret' },
+  'elgeyo-marakwet': { country: 'Kenya', county: 'Elgeyo-Marakwet', town: 'Iten' },
+  'elgeyo marakwet': { country: 'Kenya', county: 'Elgeyo-Marakwet', town: 'Iten' },
+  'iten': { country: 'Kenya', county: 'Elgeyo-Marakwet', town: 'Iten' },
+  'nandi': { country: 'Kenya', county: 'Nandi', town: 'Kapsabet' },
+  'kapsabet': { country: 'Kenya', county: 'Nandi', town: 'Kapsabet' },
+  'baringo': { country: 'Kenya', county: 'Baringo', town: 'Kabarnet' },
+  'kabarnet': { country: 'Kenya', county: 'Baringo', town: 'Kabarnet' },
+  'laikipia': { country: 'Kenya', county: 'Laikipia', town: 'Nanyuki' },
+  'nanyuki': { country: 'Kenya', county: 'Laikipia', town: 'Nanyuki' },
+  'nakuru': { country: 'Kenya', county: 'Nakuru', town: 'Nakuru' },
   'naivasha': { country: 'Kenya', county: 'Nakuru', town: 'Naivasha' },
+  'narok': { country: 'Kenya', county: 'Narok', town: 'Narok' },
+  'kajiado': { country: 'Kenya', county: 'Kajiado', town: 'Kajiado' },
+  'rongai': { country: 'Kenya', county: 'Kajiado', town: 'Ongata Rongai' },
+  'ongata rongai': { country: 'Kenya', county: 'Kajiado', town: 'Ongata Rongai' },
   'ngong': { country: 'Kenya', county: 'Kajiado', town: 'Ngong' },
   'kitengela': { country: 'Kenya', county: 'Kajiado', town: 'Kitengela' },
-  'syokimau': { country: 'Kenya', county: 'Machakos', town: 'Syokimau' },
-  'eastleigh': { country: 'Kenya', county: 'Nairobi', town: 'Eastleigh' },
+  'kiserian': { country: 'Kenya', county: 'Kajiado', town: 'Kiserian' },
+  'kericho': { country: 'Kenya', county: 'Kericho', town: 'Kericho' },
+  'bomet': { country: 'Kenya', county: 'Bomet', town: 'Bomet' },
+  'kakamega': { country: 'Kenya', county: 'Kakamega', town: 'Kakamega' },
+  'vihiga': { country: 'Kenya', county: 'Vihiga', town: 'Mbale' },
+  'mbale vihiga': { country: 'Kenya', county: 'Vihiga', town: 'Mbale' },
+  'bungoma': { country: 'Kenya', county: 'Bungoma', town: 'Bungoma' },
+  'busia': { country: 'Kenya', county: 'Busia', town: 'Busia' },
+  'siaya': { country: 'Kenya', county: 'Siaya', town: 'Siaya' },
+  'bondo': { country: 'Kenya', county: 'Siaya', town: 'Bondo' },
+  'kisumu': { country: 'Kenya', county: 'Kisumu', town: 'Kisumu' },
+  'kondele': { country: 'Kenya', county: 'Kisumu', town: 'Kondele' },
+  'homa bay': { country: 'Kenya', county: 'Homa Bay', town: 'Homa Bay' },
+  'migori': { country: 'Kenya', county: 'Migori', town: 'Migori' },
+  'kisii': { country: 'Kenya', county: 'Kisii', town: 'Kisii' },
+  'nyamira': { country: 'Kenya', county: 'Nyamira', town: 'Nyamira' },
+  'nairobi': { country: 'Kenya', county: 'Nairobi', town: 'Nairobi' },
   'westlands': { country: 'Kenya', county: 'Nairobi', town: 'Westlands' },
+  'kilimani': { country: 'Kenya', county: 'Nairobi', town: 'Kilimani' },
   'karen': { country: 'Kenya', county: 'Nairobi', town: 'Karen' },
   'kasarani': { country: 'Kenya', county: 'Nairobi', town: 'Kasarani' },
   'roysambu': { country: 'Kenya', county: 'Nairobi', town: 'Roysambu' },
-  'kilimani': { country: 'Kenya', county: 'Nairobi', town: 'Kilimani' },
+  'eastleigh': { country: 'Kenya', county: 'Nairobi', town: 'Eastleigh' },
   'south b': { country: 'Kenya', county: 'Nairobi', town: 'South B' },
   'south c': { country: 'Kenya', county: 'Nairobi', town: 'South C' },
   'pipeline': { country: 'Kenya', county: 'Nairobi', town: 'Pipeline' },
@@ -38,18 +101,11 @@ export const WORLDWIDE_LOCATIONS: { [key: string]: { country: string; county: st
   'kahawa west': { country: 'Kenya', county: 'Nairobi', town: 'Kahawa West' },
   'umoja': { country: 'Kenya', county: 'Nairobi', town: 'Umoja' },
   'buruburu': { country: 'Kenya', county: 'Nairobi', town: 'Buruburu' },
+  'syokimau': { country: 'Kenya', county: 'Machakos', town: 'Syokimau' },
   'nyali': { country: 'Kenya', county: 'Mombasa', town: 'Nyali' },
   'bamburi': { country: 'Kenya', county: 'Mombasa', town: 'Bamburi' },
   'mtwapa': { country: 'Kenya', county: 'Kilifi', town: 'Mtwapa' },
   'diani': { country: 'Kenya', county: 'Kwale', town: 'Diani' },
-  'kondele': { country: 'Kenya', county: 'Kisumu', town: 'Kondele' },
-  'nyeri': { country: 'Kenya', county: 'Nyeri', town: 'Nyeri' },
-  'meru': { country: 'Kenya', county: 'Meru', town: 'Meru' },
-  'kakamega': { country: 'Kenya', county: 'Kakamega', town: 'Kakamega' },
-  'kericho': { country: 'Kenya', county: 'Kericho', town: 'Kericho' },
-  'kisii': { country: 'Kenya', county: 'Kisii', town: 'Kisii' },
-  'garissa': { country: 'Kenya', county: 'Garissa', town: 'Garissa' },
-  'kilifi': { country: 'Kenya', county: 'Kilifi', town: 'Kilifi' },
 
   // Worldwide Hubs
   'los angeles': { country: 'United States', county: 'California', town: 'Los Angeles' },
@@ -1066,7 +1122,16 @@ export function calculateMatchScore(queryOrAnalysis: string | SearchQueryAnalysi
 
   let tokensMatched = 0;
   for (const token of queryTokens) {
-    if (allSearchableWords.some(w => w === token || (w.startsWith(token) && Math.abs(w.length - token.length) <= 2))) {
+    const tClean = token.toLowerCase();
+    const tStem = tClean.endsWith('ies') ? tClean.slice(0, -3) + 'y' : (tClean.endsWith('es') ? tClean.slice(0, -2) : (tClean.endsWith('s') ? tClean.slice(0, -1) : tClean));
+    if (allSearchableWords.some(w => {
+      const wClean = w.toLowerCase();
+      const wStem = wClean.endsWith('ies') ? wClean.slice(0, -3) + 'y' : (wClean.endsWith('es') ? wClean.slice(0, -2) : (wClean.endsWith('s') ? wClean.slice(0, -1) : wClean));
+      return wClean === tClean || 
+             wStem === tStem || 
+             (tStem.length >= 3 && (wClean.startsWith(tStem) || tStem.startsWith(wClean))) ||
+             (wClean.startsWith(tClean) && Math.abs(wClean.length - tClean.length) <= 2);
+    })) {
       tokensMatched++;
     }
   }
@@ -1094,6 +1159,9 @@ export function searchProducts(
   const targetLocation = selectedCounty || analysis.detectedLocation;
 
   let candidates = products;
+
+  // 0. Strict Kenya-only search scope: exclude products without verified Kenyan provenance
+  candidates = candidates.filter(p => isKenyanProvenance(p));
 
   // 1. Strict Location Filtering:
   // If user searched "bedsitters Rongai" or selected Rongai, ONLY return items strictly matching Rongai.
@@ -1213,7 +1281,8 @@ export async function searchRealtimePrice(
 
       if (res.ok) {
         const data = await res.json();
-        if (data.verified && (data.product || (data.products && data.products.length > 0))) {
+        // Accept products returned by backend even if overall verified is false (e.g. unverified web search snippets)
+        if ((data.hasLiveResults || data.verified || (data.products && data.products.length > 0) || data.product) && (data.product || (data.products && data.products.length > 0))) {
           const prods: Product[] = data.products && data.products.length > 0
             ? data.products
             : (data.product ? [data.product] : []);
@@ -1249,7 +1318,10 @@ export async function searchRealtimePrice(
   const combinedMap = new Map<string, Product>();
 
   for (const p of [...backendRes.products, ...connectorRes.products]) {
-    const key = p.name.toLowerCase().replace(/[^a-z0-9]/g, ' ').trim().split(/\s+/).slice(0, 3).join('-');
+    const sizeVariant = p.sizeOrQuantity || p.unit || (p.name.match(/\b\d+(?:\.\d+)?\s*(?:kg|g|litre|litres|l|ml|pack|pair|pieces|seater|kg refill)\b/i)?.[0] || '');
+    const storageVariant = p.name.match(/\b(32|64|128|256|512)\s*(?:gb|gig)\b/i)?.[0] || '';
+    const cleanTokens = p.name.toLowerCase().replace(/[^a-z0-9]/g, ' ').trim().split(/\s+/).filter(t => t.length > 2);
+    const key = `${cleanTokens.slice(0, 5).join('-')}-${(sizeVariant || storageVariant).toLowerCase().replace(/\s+/g, '')}`;
     if (!combinedMap.has(key)) {
       combinedMap.set(key, { ...p });
     } else {
@@ -1287,8 +1359,10 @@ export async function searchRealtimePrice(
       : mergedProducts.filter(p => !p.isDemo && !p.name.includes('[DEMO DATA]') && !(p.retailerOrSource && p.retailerOrSource.includes('[DEMO DATA]')));
 
     if (filteredProducts.length > 0) {
+      // Truthful verification: true ONLY if at least one product has verified 1P/official/direct price
+      const hasAnyVerified = filteredProducts.some(p => p.verified && !p.isDemo && p.priceType !== 'COMMUNITY_REPORT' && p.acquisitionMethod !== 'search_snippet');
       return {
-        verified: filteredProducts.some(p => !p.isDemo),
+        verified: hasAnyVerified,
         product: filteredProducts[0],
         products: filteredProducts,
         sources: allSources
@@ -1296,11 +1370,11 @@ export async function searchRealtimePrice(
     }
   }
 
-  // 3. If no verified live price found across connected sources
+  // 3. If no price found across connected sources
   return {
     verified: false,
     product: null,
     products: [],
-    message: "No verified current price found."
+    message: "No current price found."
   };
 }

@@ -74,7 +74,12 @@ export function extractRawImageUrl(raw: unknown): string | null {
   }
 
   // Reject generic Unsplash images or generic placeholders per instructions
-  if (str.includes('unsplash.com')) {
+  if (str.includes('unsplash.com') || /\b(logo|site-logo|favicon|woocommerce-placeholder)\b/i.test(str)) {
+    return null;
+  }
+
+  // Reject internal routes, dynamic OpenGraph HTML routes without image extension
+  if (/\b(opengraph-image|open-graph-image|twitter-image)\b/i.test(str) && !/\.(jpe?g|png|webp|avif|gif)(\?|$)/i.test(str)) {
     return null;
   }
 
@@ -149,7 +154,6 @@ export async function discoverProductImageAsync(product: {
 
       const res = await fetch(`/api/image-fallback?${params.toString()}`);
       if (!res.ok) {
-        clientDiscoveryCache.set(cacheKey, null);
         return null;
       }
 
@@ -158,10 +162,11 @@ export async function discoverProductImageAsync(product: {
         ? data.imageUrl.trim()
         : null;
 
-      clientDiscoveryCache.set(cacheKey, discoveredUrl);
+      if (discoveredUrl) {
+        clientDiscoveryCache.set(cacheKey, discoveredUrl);
+      }
       return discoveredUrl;
     } catch {
-      clientDiscoveryCache.set(cacheKey, null);
       return null;
     } finally {
       inFlightDiscoveries.delete(cacheKey);

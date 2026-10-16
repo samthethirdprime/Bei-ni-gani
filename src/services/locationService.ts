@@ -590,6 +590,55 @@ export function cleanLoc(str?: string): string {
 }
 
 /**
+ * Strict Kenyan Geographic Provenance Verification
+ * Confirms whether an item actually belongs to Kenya.
+ * Does NOT treat a missing country field as proof that a product is Kenyan.
+ * Excludes records with unconfirmed geographic provenance.
+ */
+export function isKenyanProvenance(item: {
+  country?: string;
+  county?: string;
+  town?: string;
+  area?: string;
+  location?: string;
+}): boolean {
+  if (item.country) {
+    const c = cleanLoc(item.country);
+    if (c === 'kenya' || c === 'ke') return true;
+    // Explicit non-Kenyan country
+    return false;
+  }
+
+  // If country is missing, check whether county, town, area, or location confirms Kenyan geography
+  const countyClean = cleanLoc(item.county);
+  if (countyClean && KENYA_47_COUNTIES.some(c => cleanLoc(c) === countyClean)) {
+    return true;
+  }
+
+  const locText = cleanLoc(`${item.county || ''} ${item.town || ''} ${item.area || ''} ${item.location || ''}`);
+  if (!locText) {
+    return false; // No confirmed geographic provenance
+  }
+
+  // Check Kenyan 47 counties
+  if (KENYA_47_COUNTIES.some(c => locText.includes(cleanLoc(c)))) {
+    return true;
+  }
+
+  // Check Kenyan hierarchy
+  if (KENYAN_HIERARCHY.some(node => {
+    if (locText.includes(cleanLoc(node.town))) return true;
+    if (node.areas.some(a => locText.includes(cleanLoc(a)))) return true;
+    if (node.estates?.some(e => locText.includes(cleanLoc(e)))) return true;
+    return false;
+  })) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Strict Worldwide Location Verification
  * If user specifies 'Rongai', returns true ONLY if the item's location is actually in Rongai.
  * If user specifies 'Los Angeles', returns true ONLY if the item's location is in Los Angeles.
@@ -606,25 +655,22 @@ export function matchesStrictLocation(
   },
   requestedLocation?: string
 ): boolean {
-  if (!requestedLocation || !requestedLocation.trim()) return true;
+  // Reject items with non-Kenyan or unconfirmed geographic provenance
+  if (!isKenyanProvenance(item)) {
+    return false;
+  }
 
-  const target = cleanLoc(requestedLocation);
-  if (!target || target === 'worldwide' || target === 'global' || target === 'all' || target === 'all locations') {
+  if (!requestedLocation || !requestedLocation.trim()) {
+    // Default search country is Kenya (all 47 counties)
     return true;
   }
 
-  // Country level matching
-  if (target === 'kenya' || target === 'all kenya' || target === 'national') {
-    return !item.country || cleanLoc(item.country) === 'kenya';
+  const target = cleanLoc(requestedLocation);
+  if (!target || target === 'kenya' || target === 'all kenya' || target === 'national' || target === 'all' || target === 'all locations' || target === 'worldwide' || target === 'global') {
+    return true;
   }
 
-  // Match against target country directly
-  const targetCountry = WORLDWIDE_COUNTRIES.find(c => cleanLoc(c.name) === target || cleanLoc(c.code) === target);
-  if (targetCountry) {
-    return cleanLoc(item.country) === cleanLoc(targetCountry.name);
-  }
-
-  // Check Kenyan hierarchy nodes
+  // Check Kenyan hierarchy nodes (Towns, Areas, Estates)
   const matchedKenyanNode = KENYAN_HIERARCHY.find(node => {
     if (cleanLoc(node.town) === target || cleanLoc(node.town).includes(target) || target.includes(cleanLoc(node.town))) return true;
     if (node.areas.some(a => cleanLoc(a) === target || cleanLoc(a).includes(target) || target.includes(cleanLoc(a)))) return true;
@@ -632,12 +678,17 @@ export function matchesStrictLocation(
     return false;
   });
 
-  const itemCountry = cleanLoc(item.country || 'kenya');
   const itemCounty = cleanLoc(item.county);
   const itemTown = cleanLoc(item.town);
   const itemArea = cleanLoc(item.area);
   const itemLoc = cleanLoc(item.location);
-  const combinedItemText = `${itemCountry} ${itemCounty} ${itemTown} ${itemArea} ${itemLoc}`.trim();
+  const combinedItemText = `${itemCounty} ${itemTown} ${itemArea} ${itemLoc}`.trim();
+
+  // Check if requested location is one of Kenya's 47 counties
+  const isCountySearch = KENYA_47_COUNTIES.some(c => cleanLoc(c) === target);
+  if (isCountySearch) {
+    return itemCounty === target || combinedItemText.includes(target);
+  }
 
   if (matchedKenyanNode) {
     const isExplicitlyInNode = 
@@ -649,35 +700,12 @@ export function matchesStrictLocation(
     return isExplicitlyInNode;
   }
 
-  // Global cities and neighborhoods matching
-  for (const country of WORLDWIDE_COUNTRIES) {
-    for (const sub of country.subdivisions) {
-      if (cleanLoc(sub.name) === target) {
-        return combinedItemText.includes(target) || itemCounty === target;
-      }
-      if (sub.cities) {
-        for (const city of sub.cities) {
-          if (cleanLoc(city.name) === target) {
-            return combinedItemText.includes(cleanLoc(city.name));
-          }
-          if (city.neighborhoods) {
-            for (const n of city.neighborhoods) {
-              if (cleanLoc(n) === target || target.includes(cleanLoc(n))) {
-                return combinedItemText.includes(cleanLoc(n)) || cleanLoc(itemArea) === cleanLoc(n);
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // Strict token inclusion fallback
+  // Strict token inclusion within Kenyan item locality fields
   return combinedItemText.includes(target);
 }
 
 /**
- * Get nearby areas when a requested location has 0 verified results
+ * Get nearby Kenyan areas when a requested location has 0 verified results
  */
 export function getNearbyLocations(locationName: string): string[] {
   const target = cleanLoc(locationName);
@@ -699,33 +727,19 @@ export function getNearbyLocations(locationName: string): string[] {
     return ['Nairobi', 'Kiambu', 'Kajiado', 'Mombasa', 'Nakuru'];
   }
 
-  // Check international cities
-  if (target.includes('angeles') || target.includes('california')) {
-    return ['San Francisco', 'San Diego', 'California', 'USA'];
-  }
-  if (target.includes('london') || target.includes('england')) {
-    return ['Manchester', 'Birmingham', 'England', 'United Kingdom'];
-  }
-  if (target.includes('lagos') || target.includes('abuja')) {
-    return ['Ikeja', 'Victoria Island', 'Abuja', 'Nigeria'];
-  }
-  if (target.includes('johannesburg') || target.includes('sandton')) {
-    return ['Pretoria', 'Cape Town', 'Gauteng', 'South Africa'];
-  }
-
-  return ['Nairobi', 'Kiambu', 'Mombasa', 'Worldwide'];
+  return ['Nairobi', 'Kiambu', 'Mombasa', 'Nakuru', 'Kisumu'];
 }
 
 /**
  * Format location string for display
  */
 export function formatStructuredLocation(
-  country?: string,
+  country: string = 'Kenya',
   county?: string,
   town?: string,
   area?: string
 ): string {
   const parts = [area, town, county, country].filter(Boolean);
   const uniqueParts = Array.from(new Set(parts.map(p => p?.trim()))).filter(Boolean);
-  return uniqueParts.join(', ') || 'Worldwide';
+  return uniqueParts.join(', ') || 'Kenya';
 }

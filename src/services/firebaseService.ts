@@ -129,7 +129,7 @@ export function subscribeToProducts(
     );
     return unsubscribe;
   } catch (error) {
-    handleFirestoreError(error, OperationType.LIST, PRODUCTS_COLLECTION);
+    console.warn('Firestore subscription unavailable, continuing offline:', error);
     return () => {};
   }
 }

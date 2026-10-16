@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   MapPin, 
@@ -59,16 +59,16 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const imageUrl = getProductImageUrl(product);
   const [currentImgSrc, setCurrentImgSrc] = useState<string | null>(imageUrl);
   const [imageFailed, setImageFailed] = useState(false);
-  const [hasTriedProxy, setHasTriedProxy] = useState(false);
   const [hasTriedDiscovery, setHasTriedDiscovery] = useState(false);
   const [imgSource, setImgSource] = useState<'retailer' | 'fallback' | 'discovered' | 'generic' | null>(
     imageUrl ? (isFallbackProductImage(imageUrl) ? 'fallback' : (product?.imageSource || 'retailer')) : null
   );
+  const triedUrlsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    triedUrlsRef.current.clear();
     setCurrentImgSrc(imageUrl);
     setImageFailed(false);
-    setHasTriedProxy(false);
     setHasTriedDiscovery(false);
     setImgSource(imageUrl ? (isFallbackProductImage(imageUrl) ? 'fallback' : (product?.imageSource || 'retailer')) : null);
 
@@ -82,6 +82,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     // Trigger async discovery if product has no retailer image and no local fallback
     if (!imageUrl && product?.name) {
       let isCancelled = false;
+      const currentProductId = product.id;
       setHasTriedDiscovery(true);
       discoverProductImageAsync({
         name: product.name,
@@ -90,7 +91,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         sizeOrQuantity: product.sizeOrQuantity,
         subcategory: product.subcategory
       }).then(discoveredUrl => {
-        if (!isCancelled && discoveredUrl) {
+        if (!isCancelled && product?.id === currentProductId && discoveredUrl) {
           setCurrentImgSrc(discoveredUrl);
           setImgSource('discovered');
           setImageFailed(false);
@@ -103,23 +104,38 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   }, [product?.id, product?.name, product?.reportsCount, imageUrl]);
 
   const handleImageError = () => {
-    if (!hasTriedProxy && currentImgSrc && (currentImgSrc.startsWith('http://') || currentImgSrc.startsWith('https://')) && !currentImgSrc.startsWith('/api/image-proxy')) {
-      setHasTriedProxy(true);
-      setCurrentImgSrc(`/api/image-proxy?url=${encodeURIComponent(currentImgSrc)}`);
-      return;
+    const failedSrc = currentImgSrc;
+    if (failedSrc) {
+      triedUrlsRef.current.add(failedSrc);
     }
 
-    if (currentImgSrc && !isFallbackProductImage(currentImgSrc)) {
-      const generic = product ? getGenericProductImage(product) : null;
-      if (generic) {
-        setCurrentImgSrc(generic);
-        setImgSource('fallback');
+    // 1. Direct external image failed -> try proxy once
+    if (
+      failedSrc &&
+      (failedSrc.startsWith('http://') || failedSrc.startsWith('https://')) &&
+      !failedSrc.startsWith('/api/image-proxy')
+    ) {
+      const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(failedSrc)}`;
+      if (!triedUrlsRef.current.has(proxyUrl)) {
+        triedUrlsRef.current.add(proxyUrl);
+        setCurrentImgSrc(proxyUrl);
         return;
       }
     }
 
-    if (!hasTriedDiscovery && product?.name && imgSource !== 'discovered') {
+    // 2. Curated local photographic fallback
+    const generic = product ? getGenericProductImage(product) : null;
+    if (generic && !triedUrlsRef.current.has(generic)) {
+      triedUrlsRef.current.add(generic);
+      setCurrentImgSrc(generic);
+      setImgSource('fallback');
+      return;
+    }
+
+    // 3. Dynamic discovery (never blocked by failed initial image)
+    if (!hasTriedDiscovery && product?.name) {
       setHasTriedDiscovery(true);
+      const currentProductId = product.id;
       discoverProductImageAsync({
         name: product.name,
         category: product.category,
@@ -127,10 +143,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         sizeOrQuantity: product.sizeOrQuantity,
         subcategory: product.subcategory
       }).then(discoveredUrl => {
-        if (discoveredUrl) {
+        if (product?.id === currentProductId && discoveredUrl && !triedUrlsRef.current.has(discoveredUrl)) {
           setCurrentImgSrc(discoveredUrl);
           setImgSource('discovered');
-          setHasTriedProxy(false);
           setImageFailed(false);
         } else {
           setImageFailed(true);
@@ -141,6 +156,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       return;
     }
 
+    // 4. All layers exhausted -> neutral package placeholder
     setImageFailed(true);
   };
 

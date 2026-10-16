@@ -41,6 +41,24 @@ function resolveVendorFromDomain(domain: string): { name: string; isOfficialReta
   return { name: cleanDomain, isOfficialRetailer: false };
 }
 
+// Strictly verify that a search link belongs to a verified Kenyan domain or retailer
+export function isKenyanRetailerOrDomain(domainOrUrl: string): boolean {
+  const d = domainOrUrl.toLowerCase();
+  if (d.includes('.co.ke') || d.includes('.ke') || d.includes('.or.ke') || d.includes('.go.ke')) {
+    return true;
+  }
+  const knownKenyan = [
+    'phoneplacekenya.com', 'phonesstorekenya.com', 'gadgetsleo.com',
+    'masoko.com', 'chandaranasupermarkets.co.ke', 'ramtons.com',
+    'bamburicement.com', 'priceinkenya.com', 'e-spareparts.com',
+    'naivas.online', 'hotpoint.co.ke'
+  ];
+  if (knownKenyan.some(k => d.includes(k))) {
+    return true;
+  }
+  return false;
+}
+
 // Clean and decode redirection links
 function cleanTargetUrl(rawUrl: string): string {
   try {
@@ -215,41 +233,31 @@ export async function searchKenyanSpecialistRetailers(cleanQ: string, targetLoc:
         const cleanTitle = cleanProductTitle(rawTitle, cleanQ);
         const rawImg = m.source_url || m.guid?.rendered || m.media_details?.sizes?.medium?.source_url || m.media_details?.sizes?.full?.source_url;
         const validImg = isTrustworthyImageUrl(rawImg) ? rawImg : undefined;
-
-        // Estimate accurate Kenyan market benchmark price if specific model
-        let price = 4500;
-        const tLower = cleanTitle.toLowerCase();
-        if (tLower.includes('50000mah') || tLower.includes('85w')) price = 9500;
-        else if (tLower.includes('prime') || tLower.includes('220w')) price = 14500;
-        else if (tLower.includes('20000mah') || tLower.includes('22.5w')) price = 3800;
-        else if (tLower.includes('10000mah')) price = 2400;
-        else if (tLower.includes('tab s12 ultra')) price = 165000;
-        else if (tLower.includes('tab s12+')) price = 125000;
-        else if (tLower.includes('tab s12')) price = 98000;
-        else if (tLower.includes('a56')) price = 43900;
-        else if (tLower.includes('a16') || tLower.includes('a15')) price = 18500;
-
         const productLink = m.link || `https://www.phoneplacekenya.com/?s=${encodeURIComponent(cleanTitle)}&post_type=product`;
 
-        results.push({
-          id: `phoneplace-media-${Date.now()}-${i}`,
-          name: cleanTitle,
-          price,
-          currency: 'KES',
-          vendor: 'Phoneplace Kenya',
-          source: 'Phoneplace Kenya',
-          sourceName: 'Phoneplace Kenya',
-          sourceType: 'external',
-          acquisitionMethod: 'direct_webpage',
-          url: productLink,
-          sourceUrl: productLink,
-          image: validImg,
-          location: targetLoc !== 'Worldwide' ? targetLoc : 'Nairobi',
-          retrievedAt: new Date().toISOString(),
-          timestamp: new Date().toISOString(),
-          isVerified: true,
-          notes: 'Verified listing & authentic product media from Phoneplace Kenya'
-        });
+        // Retrieve real verified price directly from page JSON-LD / metadata
+        const pageDetails = await fetchProductPageDetails(productLink);
+        if (pageDetails && pageDetails.price && pageDetails.price > 0) {
+          results.push({
+            id: `phoneplace-verified-${Date.now()}-${i}`,
+            name: pageDetails.name || cleanTitle,
+            price: pageDetails.price,
+            currency: 'KES',
+            vendor: 'Phoneplace Kenya',
+            source: 'Phoneplace Kenya',
+            sourceName: 'Phoneplace Kenya',
+            sourceType: 'external',
+            acquisitionMethod: 'direct_webpage',
+            url: productLink,
+            sourceUrl: productLink,
+            image: pageDetails.image || validImg,
+            location: targetLoc !== 'Kenya' && targetLoc !== 'Worldwide' ? targetLoc : 'Nairobi',
+            retrievedAt: new Date().toISOString(),
+            timestamp: new Date().toISOString(),
+            isVerified: true,
+            notes: 'Verified live product listing from Phoneplace Kenya'
+          });
+        }
       }
     }
   } catch (e) {
@@ -279,34 +287,30 @@ export async function searchKenyanSpecialistRetailers(cleanQ: string, targetLoc:
           const cleanTitle = cleanProductTitle(rawTitle, cleanQ);
           const rawImg = m.source_url || m.guid?.rendered || m.media_details?.sizes?.medium?.source_url || m.media_details?.sizes?.full?.source_url;
           const validImg = isTrustworthyImageUrl(rawImg) ? rawImg : undefined;
-
-          let price = 4200;
-          const tLower = cleanTitle.toLowerCase();
-          if (tLower.includes('100w')) price = 7800;
-          else if (tLower.includes('65w') || tLower.includes('20000mah')) price = 4800;
-          else if (tLower.includes('10000mah')) price = 2600;
-
           const productLink = m.link || `https://avechi.co.ke/?s=${encodeURIComponent(cleanTitle)}&post_type=product`;
 
-          results.push({
-            id: `avechi-media-${Date.now()}-${i}`,
-            name: cleanTitle,
-            price,
-            currency: 'KES',
-            vendor: 'Avechi Kenya',
-            source: 'Avechi Kenya',
-            sourceName: 'Avechi Kenya',
-            sourceType: 'external',
-            acquisitionMethod: 'direct_webpage',
-            url: productLink,
-            sourceUrl: productLink,
-            image: validImg,
-            location: targetLoc !== 'Worldwide' ? targetLoc : 'Nairobi',
-            retrievedAt: new Date().toISOString(),
-            timestamp: new Date().toISOString(),
-            isVerified: true,
-            notes: 'Verified listing & authentic product media from Avechi Kenya'
-          });
+          const pageDetails = await fetchProductPageDetails(productLink);
+          if (pageDetails && pageDetails.price && pageDetails.price > 0) {
+            results.push({
+              id: `avechi-verified-${Date.now()}-${i}`,
+              name: pageDetails.name || cleanTitle,
+              price: pageDetails.price,
+              currency: 'KES',
+              vendor: 'Avechi Kenya',
+              source: 'Avechi Kenya',
+              sourceName: 'Avechi Kenya',
+              sourceType: 'external',
+              acquisitionMethod: 'direct_webpage',
+              url: productLink,
+              sourceUrl: productLink,
+              image: pageDetails.image || validImg,
+              location: targetLoc !== 'Kenya' && targetLoc !== 'Worldwide' ? targetLoc : 'Nairobi',
+              retrievedAt: new Date().toISOString(),
+              timestamp: new Date().toISOString(),
+              isVerified: true,
+              notes: 'Verified live product listing from Avechi Kenya'
+            });
+          }
         }
       }
     }
@@ -401,6 +405,11 @@ export class WebSearchProvider implements SearchProvider {
         const snippetText = decodeHtmlEntities(rawSnippet.replace(/<[^>]+>/g, '').trim());
         const titleText = isLite ? cleanProductTitle(rawTitleOrDomain, cleanQ) : cleanQ;
 
+        // Strictly enforce Kenya-only geographic provenance: exclude non-Kenyan domains
+        if (!isKenyanRetailerOrDomain(cleanLink)) {
+          continue;
+        }
+
         // =========================================================================
         // STRICT RELEVANCE & ANTI-COLLISION GUARDS
         // =========================================================================
@@ -484,11 +493,11 @@ export class WebSearchProvider implements SearchProvider {
               acquisitionMethod: 'search_snippet',
               url: cleanLink,
               sourceUrl: cleanLink,
-              location: targetLoc !== 'Worldwide' ? targetLoc : 'Kenya',
+              location: (!targetLoc || targetLoc === 'Worldwide' || targetLoc === 'Global') ? 'Kenya' : targetLoc,
               retrievedAt: new Date().toISOString(),
               timestamp: new Date().toISOString(),
-              isVerified: true,
-              notes: `Indexed search snippet result from ${vendorInfo.name}`
+              isVerified: false, // Unconfirmed until verified directly on retailer page
+              notes: `Unconfirmed search snippet result from ${vendorInfo.name}`
             });
 
             count++;
@@ -534,7 +543,7 @@ export class WebSearchProvider implements SearchProvider {
                 url: page.url,
                 sourceUrl: page.url,
                 image: isTrustworthyImageUrl(details.image) ? details.image : undefined,
-                location: targetLoc !== 'Worldwide' ? targetLoc : 'Kenya',
+                location: (!targetLoc || targetLoc === 'Worldwide' || targetLoc === 'Global') ? 'Kenya' : targetLoc,
                 retrievedAt: new Date().toISOString(),
                 timestamp: new Date().toISOString(),
                 isVerified: true,

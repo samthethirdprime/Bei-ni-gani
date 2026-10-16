@@ -115,7 +115,7 @@ export class KilimallConnector implements SourceConnector {
     }
 
     // 3. SMARTPHONES: Samsung A56
-    if (q.includes('samsung') && (q.includes('a56') || q.includes('phone'))) {
+    if (q.includes('a56') || q.includes('samsung') || q.includes('phone') || q.includes('smartphone') || q.includes('simu')) {
       if (q.includes('256gb') || !q.includes('128gb')) {
         listings.push({
           id: 'kili-samsung-a56-256',
