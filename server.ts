@@ -174,6 +174,14 @@ app.get('/api/connectors/status', (req, res) => {
     timestamp: new Date().toISOString(),
     connectors: [
       {
+        id: 'avechi-ke',
+        name: 'Avechi Kenya Store API',
+        status: 'CONNECTED',
+        isRealConnection: true,
+        type: 'PUBLIC_CATALOG',
+        description: 'Direct public WooCommerce Store API integration querying live catalog at avechi.co.ke.'
+      },
+      {
         id: 'community-reports-ke',
         name: 'Bei Gani Community Reports',
         status: 'CONNECTED',
@@ -207,11 +215,19 @@ app.get('/api/connectors/status', (req, res) => {
       },
       {
         id: 'kilimall-ke',
-        name: 'Kilimall Direct Feed',
-        status: 'REQUIRES_PARTNER_CREDENTIALS',
-        isRealConnection: false,
-        type: 'ENTERPRISE_API_REQUIRED',
-        description: 'Direct catalog sync requires Kilimall Open Platform credentials.'
+        name: 'Kilimall Kenya Direct Catalog',
+        status: 'CONNECTED',
+        isRealConnection: true,
+        type: 'PUBLIC_CATALOG',
+        description: 'Direct live catalog extraction from Kilimall Kenya (kilimall.co.ke).'
+      },
+      {
+        id: 'gadgetsleo-ke',
+        name: 'Gadgets Leo Kenya Store API',
+        status: 'CONNECTED',
+        isRealConnection: true,
+        type: 'PUBLIC_CATALOG',
+        description: 'Direct public WooCommerce Store API integration querying live catalog at gadgetsleo.com.'
       },
       {
         id: 'jiji-ke',

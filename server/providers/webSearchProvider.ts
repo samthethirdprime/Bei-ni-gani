@@ -35,6 +35,16 @@ function resolveVendorFromDomain(domain: string): { name: string; isOfficialReta
   if (d.includes('starmac.co.ke')) return { name: 'Starmac Kenya', isOfficialRetailer: true };
   if (d.includes('sparezonekenya.co.ke') || d.includes('sparezone')) return { name: 'Sparezone Kenya', isOfficialRetailer: true };
   if (d.includes('e-spareparts.com')) return { name: 'E-Spareparts Kenya', isOfficialRetailer: true };
+  if (d.includes('mihomekenya.co.ke')) return { name: 'Mi Home Kenya', isOfficialRetailer: true };
+  if (d.includes('xiaomi-store.co.ke')) return { name: 'Xiaomi Store Kenya', isOfficialRetailer: true };
+  if (d.includes('lighting.co.ke')) return { name: 'Lighting Kenya', isOfficialRetailer: true };
+  if (d.includes('altosounds.co.ke')) return { name: 'Alto Sounds Kenya', isOfficialRetailer: true };
+  if (d.includes('eclipsesounds.co.ke')) return { name: 'Eclipse Sounds Kenya', isOfficialRetailer: true };
+  if (d.includes('techzone.co.ke')) return { name: 'Techzone Mobile Kenya', isOfficialRetailer: true };
+  if (d.includes('xiaomihomekenya.co.ke')) return { name: 'Xiaomi Home Kenya', isOfficialRetailer: true };
+  if (d.includes('saruk.co.ke')) return { name: 'Saruk Digital Solutions', isOfficialRetailer: true };
+  if (d.includes('jamboshop.com')) return { name: 'Jamboshop Kenya', isOfficialRetailer: true };
+  if (d.includes('anisuma.com')) return { name: 'Anisuma Traders Kenya', isOfficialRetailer: true };
 
   // Clean fallback domain
   const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
@@ -51,7 +61,8 @@ export function isKenyanRetailerOrDomain(domainOrUrl: string): boolean {
     'phoneplacekenya.com', 'phonesstorekenya.com', 'gadgetsleo.com',
     'masoko.com', 'chandaranasupermarkets.co.ke', 'ramtons.com',
     'bamburicement.com', 'priceinkenya.com', 'e-spareparts.com',
-    'naivas.online', 'hotpoint.co.ke'
+    'naivas.online', 'hotpoint.co.ke', 'jamboshop.com', 'anisuma.com',
+    'pricekenya.co.ke'
   ];
   if (knownKenyan.some(k => d.includes(k))) {
     return true;
@@ -254,8 +265,8 @@ export async function searchKenyanSpecialistRetailers(cleanQ: string, targetLoc:
             location: targetLoc !== 'Kenya' && targetLoc !== 'Worldwide' ? targetLoc : 'Nairobi',
             retrievedAt: new Date().toISOString(),
             timestamp: new Date().toISOString(),
-            isVerified: true,
-            notes: 'Verified live product listing from Phoneplace Kenya'
+            isVerified: false,
+            notes: 'Online product page extraction from Phoneplace Kenya (unconfirmed checkout availability)'
           });
         }
       }
@@ -307,8 +318,8 @@ export async function searchKenyanSpecialistRetailers(cleanQ: string, targetLoc:
               location: targetLoc !== 'Kenya' && targetLoc !== 'Worldwide' ? targetLoc : 'Nairobi',
               retrievedAt: new Date().toISOString(),
               timestamp: new Date().toISOString(),
-              isVerified: true,
-              notes: 'Verified live product listing from Avechi Kenya'
+              isVerified: false,
+              notes: 'Online product page extraction from Avechi Kenya (unconfirmed checkout availability)'
             });
           }
         }
@@ -331,156 +342,235 @@ export class WebSearchProvider implements SearchProvider {
     const cleanQ = query.trim();
     const targetLoc = options?.location || 'Kenya';
     const items: NormalizedPriceResult[] = [];
+    const seenUrls = new Set<string>();
 
-    const searchQuery = `${cleanQ} price in kenya ksh ${targetLoc !== 'Kenya' && targetLoc !== 'Worldwide' ? targetLoc : ''}`.trim();
-    const timeoutMs = 6500;
-
+    const timeoutMs = 8000;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-    try {
-      let html = '';
-      const userAgents = [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15',
-        'Mozilla/5.0 (X11; Linux x86_64; rv:124.0) Gecko/20100101 Firefox/124.0'
-      ];
-      const ua = userAgents[Math.floor(Math.random() * userAgents.length)];
+    const userAgents = [
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15',
+      'Mozilla/5.0 (X11; Linux x86_64; rv:124.0) Gecko/20100101 Firefox/124.0'
+    ];
+    const ua = userAgents[Math.floor(Math.random() * userAgents.length)];
 
-      // 1. Try DuckDuckGo Lite
+    // Fetch DuckDuckGo with sub-timeout helper
+    const fetchDdgHtml = async (q: string): Promise<string> => {
+      const qEncoded = encodeURIComponent(q);
+      const subCtrl = new AbortController();
+      const subTimeout = setTimeout(() => subCtrl.abort(), 4000);
+
       try {
-        const liteUrl = `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(searchQuery)}`;
-        const liteRes = await fetch(liteUrl, {
+        const liteRes = await fetch(`https://lite.duckduckgo.com/lite/?q=${qEncoded}`, {
           headers: {
             'User-Agent': ua,
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Language': 'en-GB,en;q=0.9,sw;q=0.8'
           },
-          signal: controller.signal
+          signal: subCtrl.signal
         });
+        clearTimeout(subTimeout);
         if (liteRes.ok) {
-          html = await liteRes.text();
+          const text = await liteRes.text();
+          if (text && text.includes('result-snippet')) return text;
         }
-      } catch (liteErr) {
-        // fallback to html.duckduckgo.com
+      } catch {
+        // Fallback to html.duckduckgo.com
       }
 
-      // If Lite didn't return or was empty, try html.duckduckgo.com
-      if (!html || !html.includes('result-snippet')) {
-        try {
-          const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(searchQuery)}`;
-          const res = await fetch(url, {
-            headers: {
-              'User-Agent': ua,
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-              'Accept-Language': 'en-GB,en;q=0.9,sw;q=0.8'
-            },
-            signal: controller.signal
-          });
-          if (res.ok) {
-            html = await res.text();
-          }
-        } catch (htmlErr) {
-          // ignore
+      try {
+        const htmlCtrl = new AbortController();
+        const htmlTimeout = setTimeout(() => htmlCtrl.abort(), 3500);
+        const htmlRes = await fetch(`https://html.duckduckgo.com/html/?q=${qEncoded}`, {
+          headers: {
+            'User-Agent': ua,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-GB,en;q=0.9,sw;q=0.8'
+          },
+          signal: htmlCtrl.signal
+        });
+        clearTimeout(htmlTimeout);
+        if (htmlRes.ok) {
+          return await htmlRes.text();
         }
+      } catch {
+        // ignore
       }
+      return '';
+    };
+
+    try {
+      const q1 = `${cleanQ} price in kenya ksh ${targetLoc !== 'Kenya' && targetLoc !== 'Worldwide' ? targetLoc : ''}`.trim();
+      const q2 = `${cleanQ} jumia kilimall jiji price in kenya`.trim();
+
+      // Parallel execution of general Kenyan price query & targeted retailer discovery
+      const [htmlRes1, htmlRes2] = await Promise.allSettled([
+        fetchDdgHtml(q1),
+        fetchDdgHtml(q2)
+      ]);
 
       clearTimeout(timeoutId);
 
-      let count = 0;
+      const htmlBlocks: string[] = [];
+      if (htmlRes1.status === 'fulfilled' && htmlRes1.value) htmlBlocks.push(htmlRes1.value);
+      if (htmlRes2.status === 'fulfilled' && htmlRes2.value) htmlBlocks.push(htmlRes2.value);
+
       const pagesToInspect: { url: string; vendorName: string; snippetTitle: string }[] = [];
+      let count = 0;
 
-      // Parse either DDG Lite or standard DDG HTML if available
-      const isLite = html.includes('result-snippet');
-      const blockRegex = isLite
-        ? /<a[^>]+href=["\x27]([^"\x27]+)["\x27][^>]*class=["\x27]result-link["\x27][^>]*>([\s\S]*?)<\/a>[\s\S]*?<td[^>]*class=["\x27]result-snippet["\x27][^>]*>([\s\S]*?)<\/td>/gi
-        : /<a class="result__url"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi;
+      for (const html of htmlBlocks) {
+        const isLite = html.includes('result-snippet');
+        const blockRegex = isLite
+          ? /<a[^>]+href=["\x27]([^"\x27]+)["\x27][^>]*class=["\x27]result-link["\x27][^>]*>([\s\S]*?)<\/a>[\s\S]*?<td[^>]*class=["\x27]result-snippet["\x27][^>]*>([\s\S]*?)<\/td>/gi
+          : /<a class="result__url"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi;
 
-      let match;
-      while ((match = blockRegex.exec(html)) && count < 10) {
-        const rawUrl = match[1];
-        const rawTitleOrDomain = match[2];
-        const rawSnippet = match[3];
-        const cleanLink = cleanTargetUrl(rawUrl);
-        const snippetText = decodeHtmlEntities(rawSnippet.replace(/<[^>]+>/g, '').trim());
-        const titleText = isLite ? cleanProductTitle(rawTitleOrDomain, cleanQ) : cleanQ;
+        let match;
+        while ((match = blockRegex.exec(html)) && count < 14) {
+          const rawUrl = match[1];
+          const rawTitleOrDomain = match[2];
+          const rawSnippet = match[3];
+          const cleanLink = cleanTargetUrl(rawUrl);
 
-        // Strictly enforce Kenya-only geographic provenance: exclude non-Kenyan domains
-        if (!isKenyanRetailerOrDomain(cleanLink)) {
-          continue;
-        }
+          if (seenUrls.has(cleanLink)) continue;
 
-        // =========================================================================
-        // STRICT RELEVANCE & ANTI-COLLISION GUARDS
-        // =========================================================================
-        const combinedText = `${titleText} ${snippetText} ${cleanLink}`.toLowerCase();
-        const combinedClean = combinedText.replace(/[^a-z0-9]/g, '');
-        const qLower = cleanQ.toLowerCase();
+          // Strictly enforce Kenya-only geographic provenance
+          if (!isKenyanRetailerOrDomain(cleanLink)) continue;
 
-        // 1. Watermelon vs Bottled Water
-        if ((qLower.includes('watermelon') || qLower.includes('water melon') || qLower.includes('tikiti')) && 
-            (combinedText.includes('bottled water') || combinedText.includes('mineral water') || combinedText.includes('water tank') || combinedText.includes('drinking water'))) {
-          continue;
-        }
+          const snippetText = decodeHtmlEntities(rawSnippet.replace(/<[^>]+>/g, '').trim());
+          const titleText = isLite ? cleanProductTitle(rawTitleOrDomain, cleanQ) : cleanQ;
 
-        // 2. Boxers/Underwear vs Boxing Gloves
-        if ((qLower.includes('boxer') || qLower.includes('underwear') || qLower.includes('panties')) && 
-            (combinedText.includes('boxing glove') || combinedText.includes('punching bag') || combinedText.includes('boxing ring'))) {
-          continue;
-        }
+          const combinedText = `${titleText} ${snippetText} ${cleanLink}`.toLowerCase();
+          const combinedClean = combinedText.replace(/[^a-z0-9]/g, '');
+          const qLower = cleanQ.toLowerCase();
 
-        // 3. Shoe rack vs Shoes
-        if ((qLower.includes('shoe rack') || qLower.includes('shoerack')) && 
-            !combinedText.includes('rack') && !combinedText.includes('stand') && !combinedText.includes('organizer') && !combinedText.includes('cabinet')) {
-          continue;
-        }
+          // 1. Watermelon vs Bottled Water
+          if ((qLower.includes('watermelon') || qLower.includes('water melon') || qLower.includes('tikiti')) && 
+              (combinedText.includes('bottled water') || combinedText.includes('mineral water') || combinedText.includes('water tank') || combinedText.includes('drinking water'))) {
+            continue;
+          }
 
-        // 4. Anal plug anti-collision (must strictly require the exact query terms)
-        if (qLower === 'anal plug' && (!combinedText.includes('anal') || !combinedText.includes('plug'))) {
-          continue;
-        }
+          // 2. Boxers/Underwear vs Boxing Gloves
+          if ((qLower.includes('boxer') || qLower.includes('underwear') || qLower.includes('panties')) && 
+              (combinedText.includes('boxing glove') || combinedText.includes('punching bag') || combinedText.includes('boxing ring'))) {
+            continue;
+          }
 
-        // 5. Query token overlap with compound words & plural normalization
-        // e.g. "powerbank" matches "power bank" or "power banks"
-        const queryTokens = qLower.split(/\s+/).filter(t => t.length > 2 && !['price', 'kenya', 'ksh', 'how', 'much'].includes(t));
-        const cleanQueryCompressed = cleanQ.toLowerCase().replace(/[^a-z0-9]/g, '');
+          // 3. Shoe rack vs Shoes
+          if ((qLower.includes('shoe rack') || qLower.includes('shoerack')) && 
+              !combinedText.includes('rack') && !combinedText.includes('stand') && !combinedText.includes('organizer') && !combinedText.includes('cabinet')) {
+            continue;
+          }
 
-        let matchesTokens = false;
-        if (queryTokens.length === 0 || combinedClean.includes(cleanQueryCompressed)) {
-          matchesTokens = true;
-        } else {
-          // Check if core noun or primary token matches
-          const coreTokens = queryTokens.filter(t => !['women', 'womens', 'men', 'mens', 'genuine', 'original', 'best', 'latest', 'cheap'].includes(t));
-          const tokensToCheck = coreTokens.length > 0 ? coreTokens : queryTokens;
-          matchesTokens = tokensToCheck.some(t => {
-            const tClean = t.replace(/[^a-z0-9]/g, '');
-            const tSingular = tClean.endsWith('s') ? tClean.slice(0, -1) : tClean;
-            return combinedClean.includes(tClean) || combinedClean.includes(tSingular) || combinedText.includes(t);
-          });
-        }
+          // 4. Electric Kettle vs Kettlebell / Dumbbells
+          const isKettlebell = qLower.includes('kettlebell') || qLower.includes('kettle bell');
+          if (!isKettlebell && (qLower.includes('kettle') || qLower.includes('birika')) && 
+              (combinedText.includes('kettlebell') || combinedText.includes('dumbbell') || combinedText.includes('gym weight') || combinedText.includes('fitness'))) {
+            continue;
+          }
 
-        if (!matchesTokens) {
-          continue;
-        }
+          // 5. Query token overlap with compound words & plural normalization
+          const queryTokens = qLower.split(/\s+/).filter(t => t.length > 2 && !['price', 'kenya', 'ksh', 'how', 'much'].includes(t));
+          const cleanQueryCompressed = cleanQ.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-        // Expanded Price pattern in KES / KSh (supporting space, no space, and 'from' patterns)
-        const priceRegex = /(?:(?:Ksh\.?|KES)\s*([0-9,]+(?:\.\d{1,2})?)|(?:Price|Price:)\s*(?:Ksh\.?|KES)\s*([0-9,]+(?:\.\d{1,2})?)|(?:from\s*(?:Ksh\.?|KES)\s*([0-9,]+(?:\.\d{1,2})?))|([0-9,]+)\s*(?:Ksh\.?|KES|\/=))/i;
-        const textForPrice = `${snippetText} ${titleText}`;
-        const priceMatch = textForPrice.match(priceRegex);
+          let matchesTokens = false;
+          if (queryTokens.length === 0 || combinedClean.includes(cleanQueryCompressed)) {
+            matchesTokens = true;
+          } else {
+            const coreTokens = queryTokens.filter(t => !['women', 'womens', 'men', 'mens', 'genuine', 'original', 'best', 'latest', 'cheap'].includes(t));
+            const tokensToCheck = coreTokens.length > 0 ? coreTokens : queryTokens;
+            matchesTokens = tokensToCheck.some(t => {
+              const tClean = t.replace(/[^a-z0-9]/g, '');
+              const tSingular = tClean.endsWith('s') ? tClean.slice(0, -1) : tClean;
+              return combinedClean.includes(tClean) || combinedClean.includes(tSingular) || combinedText.includes(t);
+            });
+          }
 
-        const vendorInfo = resolveVendorFromDomain(cleanLink);
+          if (!matchesTokens) continue;
 
-        if (priceMatch) {
-          const rawPriceStr = priceMatch[1] || priceMatch[2] || priceMatch[3] || priceMatch[4];
-          const parsedPrice = parseFloat(rawPriceStr.replace(/,/g, ''));
+          // Enhanced Price patterns: support discount, range, and standard KSh/KES
+          const textForPrice = `${snippetText} ${titleText}`;
+          let parsedPrice: number | null = null;
 
-          if (parsedPrice && parsedPrice > 0 && parsedPrice < 10000000) {
-            // Sanity check: prevent delivery fees or ad counts for high-value goods
-            const isHighValue = /\b(duvet|blanket|bed|mattress|phone|tv|television|fridge|refrigerator|laptop|cooker|sofa|furniture|table|rack|powerbank|power bank)\b/i.test(titleText + ' ' + cleanQ);
+          // 1. Discount/Special price pattern: e.g. "now KSh 14,999" or "special price KES 2,500"
+          const discountMatch = textForPrice.match(/(?:now|sale|current|special price|deal|offer)[:\s]*(?:Ksh\.?|KES)\s*([0-9,]+(?:\.\d{1,2})?)/i);
+          if (discountMatch) {
+            const p = parseFloat(discountMatch[1].replace(/,/g, ''));
+            if (p > 0 && p < 10000000) parsedPrice = p;
+          }
+
+          // 2. Price range: e.g. "KSh 18,999 - KSh 22,500" or "from KSh 2,500"
+          if (!parsedPrice) {
+            const rangeMatch = textForPrice.match(/(?:(?:Ksh\.?|KES)\s*([0-9,]+(?:\.\d{1,2})?)\s*(?:-|to)\s*(?:Ksh\.?|KES)?\s*([0-9,]+(?:\.\d{1,2})?))/i);
+            if (rangeMatch) {
+              const p = parseFloat(rangeMatch[1].replace(/,/g, ''));
+              if (p > 0 && p < 10000000) parsedPrice = p;
+            }
+          }
+
+          // 3. Standard prefix & suffix patterns
+          if (!parsedPrice) {
+            const standardMatch = textForPrice.match(/(?:(?:Ksh\.?|KES)\s*([0-9,]+(?:\.\d{1,2})?)|(?:Price|Price:)\s*(?:Ksh\.?|KES)\s*([0-9,]+(?:\.\d{1,2})?)|(?:from\s*(?:Ksh\.?|KES)\s*([0-9,]+(?:\.\d{1,2})?))|([0-9,]+)\s*(?:Ksh\.?|KES|\/=))/i);
+            if (standardMatch) {
+              const rawStr = standardMatch[1] || standardMatch[2] || standardMatch[3] || standardMatch[4];
+              const p = parseFloat(rawStr.replace(/,/g, ''));
+              if (p > 0 && p < 10000000) parsedPrice = p;
+            }
+          }
+
+          const vendorInfo = resolveVendorFromDomain(cleanLink);
+
+          if (parsedPrice && parsedPrice > 0) {
+            const lowerTitleAndSnippet = `${titleText} ${snippetText}`.toLowerCase();
+            const qLower = cleanQ.toLowerCase();
+
+            // 1. Phone devices vs screen repair, case, tempered glass, or financing deposit
+            const isPhoneQuery = /\b(phone|smartphone|redmi|xiaomi|tecno|itel|infinix|samsung|galaxy|iphone|oppo)\b/i.test(qLower);
+            const isPhoneAccessoryOrRepair = /\b(screen protector|case|cover|housing|tempered glass|screen replacement|display replacement|glass replacement|repair|cracked screen|charging port|cable|charger|battery|deposit|lipa mdogo|installment|daily)\b/i.test(lowerTitleAndSnippet);
+            if (isPhoneQuery && isPhoneAccessoryOrRepair && !/\b(case|cover|protector|screen|repair|deposit|cable|charger)\b/i.test(qLower)) {
+              continue;
+            }
+            if (isPhoneQuery && parsedPrice < 3500 && !/\b(case|cover|protector|screen|cable|charger)\b/i.test(qLower)) {
+              continue; // A complete smartphone in Kenya is not under KSh 3,500
+            }
+
+            // 2. Washing machine vs drain pipe, inlet hose, anti-vibration pad, cover, or repair
+            const isWashingMachineQuery = /\b(washing machine|mashine ya kufulia)\b/i.test(qLower);
+            const isWashingMachinePartOrService = /\b(hose|pipe|inlet|drain|filter|anti vibration|rubber pad|pads|feet|cover|detergent|descaler|powder|repair|service|motor|belt)\b/i.test(lowerTitleAndSnippet);
+            if (isWashingMachineQuery && isWashingMachinePartOrService && !/\b(hose|pipe|filter|pad|cover|detergent|repair)\b/i.test(qLower)) {
+              continue;
+            }
+            if (isWashingMachineQuery && parsedPrice < 12000 && !/\b(hose|pipe|filter|pad|cover|detergent|repair)\b/i.test(qLower)) {
+              continue; // A complete washing machine in Kenya is not under KSh 12,000
+            }
+
+            // 3. LED lights / LED strip lights vs single bare diode, chip, or clip
+            const isLedQuery = /\b(led lights|led strip|led bulb|strip lights)\b/i.test(qLower);
+            const isBareLedComponent = /\b(bare diode|5mm diode|bead|resistor|mounting clip|pin connector)\b/i.test(lowerTitleAndSnippet);
+            if (isLedQuery && isBareLedComponent && !/\b(diode|chip|resistor|clip)\b/i.test(qLower)) {
+              continue;
+            }
+            if (isLedQuery && parsedPrice < 80 && !/\b(diode|chip|resistor|clip)\b/i.test(qLower)) {
+              continue; // Functional LED bulb/strip in Kenya is not under KSh 80
+            }
+
+            // 4. Dog food: clarify unit if single wet pouch
+            let itemUnit = 'unit';
+            if (qLower.includes('dog food') || qLower.includes('chakula cha mbwa')) {
+              if (parsedPrice < 300 || lowerTitleAndSnippet.includes('85g') || lowerTitleAndSnippet.includes('100g') || lowerTitleAndSnippet.includes('pouch')) {
+                itemUnit = '85g-100g wet pouch';
+              } else {
+                itemUnit = 'bag / pack';
+              }
+            }
+
+            // General sanity check: prevent delivery fees or ad counts for high-value goods
+            const isHighValue = /\b(duvet|blanket|bed|mattress|phone|tv|television|fridge|refrigerator|laptop|cooker|sofa|furniture|table|rack|powerbank|power bank|guitar|instrument|washing machine)\b/i.test(titleText + ' ' + cleanQ);
             if (isHighValue && parsedPrice < 350) {
               continue;
             }
 
+            seenUrls.add(cleanLink);
             items.push({
               id: `web-${count}-${Date.now()}`,
               name: titleText,
@@ -491,36 +581,41 @@ export class WebSearchProvider implements SearchProvider {
               sourceName: vendorInfo.name,
               sourceType: 'external',
               acquisitionMethod: 'search_snippet',
+              unit: itemUnit,
               url: cleanLink,
               sourceUrl: cleanLink,
               location: (!targetLoc || targetLoc === 'Worldwide' || targetLoc === 'Global') ? 'Kenya' : targetLoc,
               retrievedAt: new Date().toISOString(),
               timestamp: new Date().toISOString(),
-              isVerified: false, // Unconfirmed until verified directly on retailer page
-              notes: `Unconfirmed search snippet result from ${vendorInfo.name}`
+              isVerified: false, // Unconfirmed search snippet
+              notes: `Online listing from ${vendorInfo.name} (unconfirmed checkout availability)`
             });
 
             count++;
-          }
-        }
 
-        // Also queue link for direct page inspection to extract verified product image & structured data
-        if (
-          !pagesToInspect.some(p => p.url === cleanLink) &&
-          pagesToInspect.length < 4 &&
-          (cleanLink.startsWith('http://') || cleanLink.startsWith('https://')) &&
-          !cleanLink.includes('google.') &&
-          !cleanLink.includes('duckduckgo.')
-        ) {
-          pagesToInspect.push({ url: cleanLink, vendorName: vendorInfo.name, snippetTitle: titleText });
+            // Queue for direct page inspection
+            if (
+              !pagesToInspect.some(p => p.url === cleanLink) &&
+              pagesToInspect.length < 4 &&
+              (cleanLink.startsWith('http://') || cleanLink.startsWith('https://')) &&
+              !cleanLink.includes('google.') &&
+              !cleanLink.includes('duckduckgo.')
+            ) {
+              pagesToInspect.push({ url: cleanLink, vendorName: vendorInfo.name, snippetTitle: titleText });
+            }
+          }
         }
       }
 
-      // Check queued direct product pages for exact structured price & image
+      // Check queued direct product pages in PARALLEL for exact structured price & image
       if (pagesToInspect.length > 0) {
-        for (const page of pagesToInspect.slice(0, 4)) {
-          const details = await fetchProductPageDetails(page.url);
-          if (details) {
+        const inspections = await Promise.allSettled(
+          pagesToInspect.map(p => fetchProductPageDetails(p.url).then(details => ({ page: p, details })))
+        );
+
+        for (const insp of inspections) {
+          if (insp.status === 'fulfilled' && insp.value.details) {
+            const { page, details } = insp.value;
             const existingItem = items.find(i => i.url === page.url || i.sourceUrl === page.url);
             if (existingItem) {
               if (!existingItem.image && isTrustworthyImageUrl(details.image)) {
@@ -546,19 +641,18 @@ export class WebSearchProvider implements SearchProvider {
                 location: (!targetLoc || targetLoc === 'Worldwide' || targetLoc === 'Global') ? 'Kenya' : targetLoc,
                 retrievedAt: new Date().toISOString(),
                 timestamp: new Date().toISOString(),
-                isVerified: true,
-                notes: `Direct webpage structured LD-JSON extraction from ${page.vendorName}`
+                isVerified: false,
+                notes: `Online webpage structured LD-JSON extraction from ${page.vendorName} (unconfirmed checkout availability)`
               });
             }
           }
         }
       }
 
-      // Query Kenyan specialist catalog search (e.g. Phoneplace Kenya) to get genuine retailer inventory with verified images
+      // Query Kenyan specialist catalog search (Phoneplace Kenya, Avechi) when relevant
       try {
         const specialistItems = await searchKenyanSpecialistRetailers(cleanQ, targetLoc);
         if (specialistItems.length > 0) {
-          // Prepend specialist items so products with verified images and prices take precedence over text snippets
           const existingNames = new Set(items.map(i => i.name.toLowerCase()));
           const newSpecialist = specialistItems.filter(s => !existingNames.has(s.name.toLowerCase()));
           items.unshift(...newSpecialist);

@@ -1,9 +1,11 @@
 import { SearchProvider, ProviderSearchResult, NormalizedPriceResult, ProviderStatus, SearchOptions } from './types';
+import { AvechiProvider } from './avechiProvider';
+import { KilimallProvider } from './kilimallProvider';
+import { GadgetsLeoProvider } from './gadgetsLeoProvider';
 import { CommunityProvider } from './communityProvider';
 import { OfficialProvider } from './officialProvider';
 import { WebSearchProvider } from './webSearchProvider';
 import { JumiaProvider } from './jumiaProvider';
-import { KilimallProvider } from './kilimallProvider';
 import { JijiProvider } from './jijiProvider';
 import { MasokoProvider } from './masokoProvider';
 import { SupermarketsProvider } from './supermarketsProvider';
@@ -13,11 +15,13 @@ export class SearchAggregator {
 
   constructor() {
     this.providers = [
+      new AvechiProvider(),
+      new KilimallProvider(),
+      new GadgetsLeoProvider(),
       new CommunityProvider(),
       new OfficialProvider(),
       new WebSearchProvider(),
       new JumiaProvider(),
-      new KilimallProvider(),
       new JijiProvider(),
       new MasokoProvider(),
       new SupermarketsProvider()
@@ -63,7 +67,7 @@ export class SearchAggregator {
 
     // Execute all providers with individual timeout protection
     const promises = this.providers.map(async (provider) => {
-      const perProviderTimeoutMs = 6500;
+      const perProviderTimeoutMs = 4500;
       let timer: any;
       const timeoutPromise = new Promise<ProviderSearchResult>((resolve) => {
         timer = setTimeout(() => {

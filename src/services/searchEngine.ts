@@ -661,12 +661,76 @@ export const BASE_PRODUCTS: BaseProductDef[] = [
     name: 'Smartphones (Simu)',
     category: 'electronics',
     subcategory: 'Smartphones',
-    aliases: ['smartphone', 'smartphones', 'phone', 'simu', 'samsung', 'iphone', 'tecno', 'infinix', 'oppo', 'redmi'],
+    aliases: ['smartphone', 'smartphones', 'phone', 'simu', 'mobile phone', 'simu ya mkononi', 'feature phone', 'cell phone'],
     variants: [
+      { key: '14c', name: 'Redmi 14C', aliases: ['14c', 'redmi 14c', '14 c'] },
+      { key: '15c', name: 'Redmi 15C', aliases: ['15c', 'redmi 15c', '15 c'] },
+      { key: 'note17', name: 'Redmi Note 17', aliases: ['note 17', 'redmi note 17', 'note17'] },
+      { key: 'note14', name: 'Redmi Note 14', aliases: ['note 14', 'redmi note 14', 'note14'] },
       { key: 'a56', name: 'Galaxy A56', aliases: ['a56', 'galaxy a56'] },
       { key: 'a36', name: 'Galaxy A36', aliases: ['a36', 'galaxy a36'] },
       { key: 'a55', name: 'Galaxy A55', aliases: ['a55', 'galaxy a55'] },
-      { key: 'case', name: 'Phone Case / Cover', aliases: ['case', 'cover', 'screen protector'] }
+      { key: 'a15', name: 'Galaxy A15', aliases: ['a15', 'galaxy a15'] },
+      { key: 'a50', name: 'itel A50', aliases: ['a50', 'itel a50'] },
+      { key: 'spark', name: 'Tecno Spark', aliases: ['spark', 'tecno spark'] }
+    ]
+  },
+  {
+    key: 'laptops',
+    name: 'Laptops & Computers',
+    category: 'electronics',
+    subcategory: 'Laptops & Computers',
+    aliases: ['laptop', 'laptops', 'notebook', 'notebooks', 'computer', 'elitebook', 'probook', 'thinkpad'],
+    variants: [
+      { key: '8gb', name: '8GB RAM Laptops', aliases: ['8gb', '8gb ram', '8 gb ram'] },
+      { key: '16gb', name: '16GB RAM Laptops', aliases: ['16gb', '16gb ram', '16 gb ram'] },
+      { key: '4gb', name: '4GB RAM Laptops', aliases: ['4gb', '4gb ram', '4 gb ram'] }
+    ]
+  },
+  {
+    key: 'refrigerators',
+    name: 'Fridges & Freezers',
+    category: 'appliances',
+    subcategory: 'Refrigeration',
+    aliases: ['fridge', 'fridges', 'refrigerator', 'refrigerators', 'freezer', 'freezers', 'chombo cha barafu'],
+    variants: [
+      { key: 'double_door', name: 'Double Door Fridge', aliases: ['double door', '2 door'] },
+      { key: 'single_door', name: 'Single Door Fridge', aliases: ['single door', '1 door'] }
+    ]
+  },
+  {
+    key: 'washing_machines',
+    name: 'Washing Machines',
+    category: 'appliances',
+    subcategory: 'Laundry Appliances',
+    aliases: ['washing machine', 'washing machines', 'washer', 'mashine ya kufulia', 'laundry washer'],
+    variants: [
+      { key: 'front_load', name: 'Front Load Washer', aliases: ['front load', 'front loader'] },
+      { key: 'top_load', name: 'Top Load Washer', aliases: ['top load', 'top loader'] },
+      { key: 'twin_tub', name: 'Twin Tub Washer', aliases: ['twin tub', 'semi automatic'] }
+    ]
+  },
+  {
+    key: 'kettles',
+    name: 'Electric Kettles',
+    category: 'kitchen',
+    subcategory: 'Small Appliances',
+    aliases: ['kettle', 'kettles', 'electric kettle', 'birika', 'water kettle', 'tea kettle'],
+    variants: [
+      { key: 'cordless', name: 'Cordless Kettle', aliases: ['cordless', 'stainless steel'] },
+      { key: 'smart', name: 'Smart Electric Kettle', aliases: ['smart kettle', 'smart'] }
+    ]
+  },
+  {
+    key: 'led_lights',
+    name: 'LED Lights & Fixtures',
+    category: 'hardware',
+    subcategory: 'Lighting & Electrical',
+    aliases: ['led lights', 'led light', 'led bulb', 'led strip', 'strip lights', 'lighting', 'bulbs', 'taa'],
+    variants: [
+      { key: 'bulb', name: 'LED Bulbs', aliases: ['bulb', 'bulbs'] },
+      { key: 'tube', name: 'LED Tube / Emergency Light', aliases: ['tube', 'tube light', 'emergency light'] },
+      { key: 'strip', name: 'LED Strip Lights', aliases: ['strip', 'strip light'] }
     ]
   },
   {
@@ -774,14 +838,14 @@ export const BASE_PRODUCTS: BaseProductDef[] = [
 
 // Brand dictionary for Kenya
 const KNOWN_BRANDS = [
-  'samsung', 'apple', 'iphone', 'tecno', 'infinix', 'xiaomi', 'oppo', 'nokia', 'sony', 'lg',
+  'samsung', 'apple', 'iphone', 'tecno', 'infinix', 'xiaomi', 'redmi', 'itel', 'oppo', 'nokia', 'sony', 'lg',
   'hp', 'dell', 'lenovo', 'asus', 'acer', 'macbook', 'jbl', 'ramtons', 'mika', 'bruhm', 'hisense',
   'bamburi', 'savannah', 'mombasa cement', 'blue triangle', 'dumuzas', 'totalenergies', 'total',
   'rubis', 'k-gas', 'afrigas', 'hashi', 'bobmil', 'superfoam', 'vitafoam', 'geisha', 'dettol',
   'colgate', 'sensodyne', 'close up', 'nike', 'adidas', 'puma', 'bata', 'kiwi', 'menengai', 'bidco',
   'kabras', 'mumias', 'ndhiwa', 'nutrameal', 'daawat', 'sunrice', 'pearl', 'amana', 'brookside',
   'kcc', 'ilara', 'tuzo', 'soko', 'jogoo', 'pembe', 'ajab', 'exe', 'fresh fri', 'rina', 'elianto',
-  'supaloaf', 'broadways', 'festive'
+  'supaloaf', 'broadways', 'festive', 'realme', 'vivo', 'huawei', 'yamaha'
 ];
 
 // Size & Quantity patterns
@@ -835,7 +899,22 @@ export function analyzeSearchQuery(rawQuery: string): SearchQueryAnalysis {
   for (const brand of KNOWN_BRANDS) {
     const brandRegex = new RegExp(`\\b${brand}\\b`, 'i');
     if (brandRegex.test(cleaned)) {
-      detectedBrand = brand.charAt(0).toUpperCase() + brand.slice(1);
+      const bLower = brand.toLowerCase();
+      if (bLower === 'redmi') {
+        detectedBrand = 'Redmi';
+      } else if (bLower === 'itel') {
+        detectedBrand = 'itel';
+      } else if (bLower === 'iphone') {
+        detectedBrand = 'Apple';
+      } else if (bLower === 'xiaomi') {
+        detectedBrand = 'Xiaomi';
+      } else if (bLower === 'tecno') {
+        detectedBrand = 'Tecno';
+      } else if (bLower === 'infinix') {
+        detectedBrand = 'Infinix';
+      } else {
+        detectedBrand = brand.charAt(0).toUpperCase() + brand.slice(1);
+      }
       break;
     }
   }
@@ -944,10 +1023,14 @@ export function getCanonicalVariants(text: string): string[] {
   if (norm.includes('tikitimaji')) variants.add(norm.replace('tikitimaji', 'tikiti maji'));
   if (norm.includes('tikiti maji')) variants.add(norm.replace('tikiti maji', 'tikitimaji'));
 
-  // Match concept aliases
+  // Match concept aliases with strict word-boundary matching (prevents "kettle" expanding to "kettlebell" -> "dumbbells")
   for (const concept of CANONICAL_CONCEPTS) {
-    if (concept.aliases.some(a => norm === a || norm.includes(a) || a.includes(norm))) {
-      concept.aliases.forEach(a => variants.add(a));
+    const hasConceptMatch = concept.aliases.some(a => {
+      const al = cleanQuery(a);
+      return al === norm || norm.split(/\s+/).includes(al) || (al.length >= 4 && al.split(/\s+/).includes(norm));
+    });
+    if (hasConceptMatch) {
+      concept.aliases.forEach(a => variants.add(cleanQuery(a)));
     }
   }
 
@@ -1018,14 +1101,109 @@ export function calculateMatchScore(queryOrAnalysis: string | SearchQueryAnalysi
     return 0; // User asked for shoes to wear, not a furniture shoe rack
   }
 
-  // 4. Smartphone vs Phone Case / Screen Protector:
-  const userWantsAccessory = /\b(case|cover|protector|screen protector|cable|charger|chaja)\b/i.test(cleanQ);
-  const productIsAccessory = /\b(case|cover|protector|screen protector)\b/i.test(prodName);
-  if (!userWantsAccessory && productIsAccessory) {
+  // 4. Device vs Phone Case, Screen Protector, Repair Service, or Spare Part:
+  const userWantsAccessoryOrRepair = /\b(case|cover|protector|screen protector|tempered glass|cable|charger|chaja|repair|replacement|spare|parts|hose|pipe|filter|drain|pad|pads|feet|fundi|glass replacement|display replacement)\b/i.test(cleanQ);
+  const productIsAccessoryOrRepair = /\b(case|cover|protector|screen protector|tempered glass|screen glass|display replacement|glass replacement|repair|spare part|spare parts|sparezone|inlet pipe|drain hose|anti vibration|rubber feet)\b/i.test(prodName + ' ' + swaName + ' ' + (product.subcategory || '') + ' ' + aliases.join(' '));
+
+  if (!userWantsAccessoryOrRepair && productIsAccessoryOrRepair) {
+    return 0; // Device query must NEVER return an accessory, repair service or spare part!
+  }
+  if (userWantsAccessoryOrRepair && !productIsAccessoryOrRepair && (category === 'electronics' || category === 'appliances')) {
+    return 0; // Accessory query must not return the parent device
+  }
+
+  // 5. Electric Kettle vs Kettlebell / Dumbbells / Weights
+  const isKettlebellQuery = cleanQ.includes('kettlebell') || cleanQ.includes('kettle bell');
+  const isKettleQuery = (cleanQ.includes('kettle') || cleanQ.includes('birika') || cleanQ.includes('electric kettle')) && !isKettlebellQuery;
+  const isGymWeightProduct = category === 'fitness' || subcategory.includes('weights') || prodName.includes('dumbbell') || prodName.includes('kettlebell') || prodName.includes('weights') || aliases.some(a => a.includes('dumbbell') || a.includes('weights') || a === 'kettlebell');
+  if (isKettleQuery && isGymWeightProduct) {
+    return 0; // Absolute block: water heating kettle is not a gym dumbbell/kettlebell
+  }
+  if (isKettlebellQuery && (category.includes('appliances') || prodName.includes('electric kettle') || prodName.includes('tea kettle'))) {
     return 0;
   }
-  if (userWantsAccessory && !productIsAccessory && category === 'electronics') {
+
+  // 6. Beef vs Chicken / Poultry
+  const isBeefSpecificQuery = cleanQ === 'beef' || cleanQ.includes('beef') || cleanQ.includes("ng'ombe") || cleanQ.includes('ngombe');
+  const isChickenProduct = prodName.includes('chicken') || prodName.includes('kuku') || aliases.some(a => a === 'chicken' || a === 'kuku');
+  if (isBeefSpecificQuery && isChickenProduct) {
+    return 0; // Absolute block: beef query should not return chicken!
+  }
+
+  // 7. Complete Washing Machine vs Spare parts, Hoses, Detergent, or Repair:
+  const isWashingMachineQuery = /\b(washing machine|mashine ya kufulia)\b/i.test(cleanQ);
+  const isWashingMachinePartOrService = /\b(hose|pipe|inlet|drain|filter|anti vibration|rubber pad|pads|feet|cover|detergent|descaler|powder|repair|service|motor|belt)\b/i.test(prodName + ' ' + swaName + ' ' + (product.subcategory || ''));
+  if (isWashingMachineQuery && isWashingMachinePartOrService && !userWantsAccessoryOrRepair) {
+    return 0; // Block spare part from full washing machine query
+  }
+
+  // 8. LED Lights / LED Strip vs Bare Diode / Resistor / Chip:
+  const isLedLightingQuery = /\b(led lights|led strip|led bulb|strip lights|lighting)\b/i.test(cleanQ);
+  const isBareLedComponent = /\b(bare diode|5mm diode|bead|resistor|mounting clip|pin connector)\b/i.test(prodName + ' ' + (product.subcategory || ''));
+  if (isLedLightingQuery && isBareLedComponent && !userWantsAccessoryOrRepair) {
     return 0;
+  }
+
+  // 9. Strict Brand Isolation Guard:
+  // Enforce brand identity for Xiaomi, Redmi, itel, Tecno, Infinix, Samsung, Apple, etc.
+  // Generic smartphone aliases or broad queries must NEVER substitute an explicit brand!
+  const BRAND_FAMILIES: Record<string, string[]> = {
+    redmi: ['redmi', 'xiaomi'],
+    xiaomi: ['xiaomi', 'redmi'],
+    itel: ['itel'],
+    tecno: ['tecno'],
+    infinix: ['infinix'],
+    samsung: ['samsung', 'galaxy'],
+    apple: ['apple', 'iphone', 'ipad', 'macbook'],
+    iphone: ['apple', 'iphone'],
+    oppo: ['oppo'],
+    vivo: ['vivo'],
+    nokia: ['nokia'],
+    realme: ['realme'],
+    huawei: ['huawei'],
+    yamaha: ['yamaha'],
+    hp: ['hp', 'hewlett packard', 'elitebook', 'probook'],
+    dell: ['dell', 'latitude', 'optiplex'],
+    lenovo: ['lenovo', 'thinkpad', 'ideapad'],
+    asus: ['asus', 'zenbook', 'vivobook'],
+    ramtons: ['ramtons'],
+    tcl: ['tcl'],
+    hisense: ['hisense'],
+    lg: ['lg'],
+    von: ['von', 'hotpoint'],
+    mika: ['mika'],
+    bruhm: ['bruhm']
+  };
+
+  const queriedBrandKey = Object.keys(BRAND_FAMILIES).find(b => {
+    const bRegex = new RegExp(`(^|\\s)${b}($|\\s|[0-9])`, 'i');
+    return bRegex.test(cleanQ) || (analysis.detectedBrand && analysis.detectedBrand.toLowerCase() === b);
+  });
+
+  if (queriedBrandKey) {
+    const allowedFamily = BRAND_FAMILIES[queriedBrandKey];
+    const candidateSearchable = searchableAll.toLowerCase();
+    
+    // Check if candidate product has a detected or identifiable brand from another family
+    const otherBrandFound = Object.keys(BRAND_FAMILIES).find(b => {
+      if (allowedFamily.includes(b)) return false;
+      const obRegex = new RegExp(`(^|\\s)${b}($|\\s|[0-9])`, 'i');
+      return obRegex.test(candidateSearchable) || obRegex.test(prodName) || (product.brand && obRegex.test(product.brand.toLowerCase()));
+    });
+
+    if (otherBrandFound) {
+      return 0; // Strict brand collision block! e.g. "Redmi" querying "Samsung" product returns 0!
+    }
+
+    // Candidate must contain at least one alias from the queried brand family
+    const matchesQueriedFamily = allowedFamily.some(f => {
+      const fRegex = new RegExp(`(^|\\s)${f}($|\\s|[0-9])`, 'i');
+      return fRegex.test(candidateSearchable) || fRegex.test(prodName) || (product.brand && fRegex.test(product.brand.toLowerCase()));
+    });
+
+    if (!matchesQueriedFamily) {
+      return 0; // Candidate does not match the explicitly queried brand!
+    }
   }
 
   // =========================================================================
@@ -1129,7 +1307,7 @@ export function calculateMatchScore(queryOrAnalysis: string | SearchQueryAnalysi
       const wStem = wClean.endsWith('ies') ? wClean.slice(0, -3) + 'y' : (wClean.endsWith('es') ? wClean.slice(0, -2) : (wClean.endsWith('s') ? wClean.slice(0, -1) : wClean));
       return wClean === tClean || 
              wStem === tStem || 
-             (tStem.length >= 3 && (wClean.startsWith(tStem) || tStem.startsWith(wClean))) ||
+             (tStem.length >= 3 && wClean.length >= 3 && (wClean.startsWith(tStem) || (tStem.startsWith(wClean) && Math.abs(tStem.length - wClean.length) <= 2))) ||
              (wClean.startsWith(tClean) && Math.abs(wClean.length - tClean.length) <= 2);
     })) {
       tokensMatched++;
@@ -1168,6 +1346,23 @@ export function searchProducts(
   // Never silently include Westlands, Kilimani, Nairobi CBD, etc.
   if (targetLocation && targetLocation.toLowerCase() !== 'all' && targetLocation.toLowerCase() !== 'kenya') {
     candidates = candidates.filter(p => matchesStrictLocation(p, targetLocation));
+    // Also filter individual vendors within matching products so no non-local vendors appear under a local query
+    candidates = candidates.map(p => {
+      if (!p.vendors || p.vendors.length === 0) return p;
+      const isHousing = p.category === 'housing';
+      const targetNorm = targetLocation.toLowerCase();
+      const filteredVendors = p.vendors.filter(v => {
+        const vLoc = `${v.location} ${v.country || ''}`.toLowerCase();
+        if (isHousing) {
+          return vLoc.includes(targetNorm);
+        }
+        return vLoc.includes(targetNorm) || vLoc.includes('nationwide') || vLoc.includes('kenya delivery');
+      });
+      return {
+        ...p,
+        vendors: filteredVendors.length > 0 ? filteredVendors : p.vendors
+      };
+    });
   }
 
   // 2. Filter by category if selected
@@ -1196,12 +1391,40 @@ export function searchProducts(
   return scored.map(item => item.product);
 }
 
-// Convert GroupedProductComparison from Multi-Source Connectors to unified Product format
-export function convertGroupedToProduct(group: GroupedProductComparison, targetLocation?: string): Product {
+// Convert GroupedProductComparison from Multi-Source Connectors to unified Product format with strict location filtering
+export function convertGroupedToProduct(group: GroupedProductComparison, targetLocation?: string): Product | null {
   const rep = group.listings[0];
   const hasDemoListing = group.listings.some(l => l.isDemo);
 
-  const vendors: VendorPrice[] = group.listings.map((l, index) => ({
+  // 1. Strict location filtering for individual vendor listings:
+  const isSpecificLocation = Boolean(targetLocation && targetLocation.toLowerCase() !== 'all' && targetLocation.toLowerCase() !== 'kenya');
+  
+  const filteredListings = isSpecificLocation
+    ? group.listings.filter(l => {
+        const lLoc = `${l.location} ${l.county || ''} ${l.town || ''} ${l.area || ''}`.toLowerCase();
+        const tLoc = targetLocation!.toLowerCase();
+        // Housing properties must strictly be located in the specified area
+        if (group.category === 'housing' || l.category === 'housing') {
+          return lLoc.includes(tLoc);
+        }
+        // Physical goods can be located in the area or explicitly nationwide
+        return lLoc.includes(tLoc) || lLoc.includes('nationwide') || lLoc.includes('kenya delivery');
+      })
+    : group.listings;
+
+  // If strict location was requested and no vendors in this group match, exclude this group completely
+  if (isSpecificLocation && filteredListings.length === 0) {
+    return null;
+  }
+
+  const listingsToUse = filteredListings;
+  const prices = listingsToUse.map(l => l.price).filter(p => p > 0);
+  const minPrice = prices.length > 0 ? Math.min(...prices) : group.lowestPrice;
+  const maxPrice = prices.length > 0 ? Math.max(...prices) : group.highestPrice;
+  const typicalPrice = prices.length > 0 ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : group.typicalPrice;
+  const distinctVendors = Array.from(new Set(listingsToUse.map(l => l.vendor)));
+
+  const vendors: VendorPrice[] = listingsToUse.map((l, index) => ({
     id: `v-conn-${index}-${Date.now()}`,
     vendorName: l.vendor,
     price: l.price,
@@ -1217,6 +1440,14 @@ export function convertGroupedToProduct(group: GroupedProductComparison, targetL
     notes: l.notes || `Source: ${l.source} (${l.sourceMethod.replace('_', ' ')})`
   }));
 
+  // 2. Truthful verification status:
+  // Statutory regulators (EPRA) = VERIFIED_OFFICIAL, verified: true
+  // Community reports = COMMUNITY_REPORT, verified: rep.isVerified
+  // Unconfigured 1P e-commerce or local fixtures = MARKET_RETAIL, verified: false, acquisitionMethod: 'search_snippet'
+  const isOfficial = rep.sourceCategory === 'OFFICIAL_REGULATOR';
+  const isCommunity = rep.sourceCategory === 'COMMUNITY';
+  const isVerified = isOfficial ? true : (isCommunity ? Boolean(rep.isVerified) : false);
+
   return {
     id: `connector-${group.canonicalId}`,
     name: group.productName,
@@ -1228,26 +1459,29 @@ export function convertGroupedToProduct(group: GroupedProductComparison, targetL
     unit: group.variant || 'unit',
     image: group.image,
     imageSource: group.imageSource || (group.image ? 'retailer' : 'fallback'),
-    typicalPrice: group.typicalPrice,
-    minPrice: group.lowestPrice,
-    maxPrice: group.highestPrice,
-    priceType: hasDemoListing ? 'MARKET_RETAIL' : (rep.sourceCategory === 'OFFICIAL_REGULATOR' ? 'VERIFIED_OFFICIAL' : (rep.sourceCategory === 'COMMUNITY' ? 'COMMUNITY_REPORT' : 'MARKET_RETAIL')),
+    typicalPrice,
+    minPrice,
+    maxPrice,
+    priceType: isOfficial ? 'VERIFIED_OFFICIAL' : (isCommunity ? 'COMMUNITY_REPORT' : 'MARKET_RETAIL'),
     county: rep.county || targetLocation || 'Kenya',
     town: rep.town || rep.location,
     area: rep.area || rep.location,
-    retailerOrSource: group.distinctVendors.slice(0, 3).join(', '),
-    dateCollected: hasDemoListing ? 'Sample Benchmark' : 'Live Multi-Source Aggregation',
-    reportsCount: group.sourcesCount,
+    retailerOrSource: distinctVendors.slice(0, 3).join(', '),
+    dateCollected: hasDemoListing ? 'Sample Benchmark' : (isOfficial ? 'Official Gazette' : 'Catalog Index'),
+    reportsCount: listingsToUse.length,
     confirmsCount: 1,
     outdatesCount: 0,
     flaggedCount: 0,
     sourceUrl: rep.sourceUrl,
-    description: hasDemoListing 
-      ? `[DEMO DATA] Reference benchmark price index. Not verified live.`
-      : `Price comparison aggregated across ${group.sourcesCount} verified Kenyan sources (${group.distinctVendors.join(', ')}). Lowest: KSh ${group.lowestPrice.toLocaleString()} | Highest: KSh ${group.highestPrice.toLocaleString()}.`,
-    isRealtimeDiscovered: !hasDemoListing,
+    description: isOfficial
+      ? `Statutory official price gazetted under Kenyan law by ${rep.source}.`
+      : (isCommunity
+        ? `Community submitted price from ${rep.location}.`
+        : `Catalog reference index across ${distinctVendors.length} Kenyan sources (${distinctVendors.join(', ')}). Lowest: KSh ${minPrice.toLocaleString()} | Highest: KSh ${maxPrice.toLocaleString()}.`),
+    isRealtimeDiscovered: false,
     isDemo: hasDemoListing,
-    verified: !hasDemoListing,
+    acquisitionMethod: isOfficial ? 'direct_api' : (isCommunity ? 'community' : 'search_snippet'),
+    verified: isVerified,
     vendors,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
@@ -1260,15 +1494,26 @@ export async function searchRealtimePrice(
   county?: string,
   category?: string,
   demoMode: boolean = false
-): Promise<{ product: Product | null; products?: Product[]; verified: boolean; message?: string; sources?: string[] }> {
+): Promise<{
+  product: Product | null;
+  products?: Product[];
+  verified: boolean;
+  message?: string;
+  sources?: string[];
+  providersStatus?: Array<{ providerId: string; providerName: string; status: string; message?: string }>;
+  unreachableRetailers?: string[];
+}> {
   const analysis = analyzeSearchQuery(rawQuery);
   const targetLocation = county || analysis.detectedLocation;
+
+  let backendFailedProviders: string[] = [];
+  let backendStatuses: Array<{ providerId: string; providerName: string; status: string; message?: string }> = [];
 
   // 1. Query server backend for live web discovery and connected sources in parallel
   const backendPromise = (async () => {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 9500);
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
       const baseUrl = typeof window !== 'undefined' ? '' : 'http://localhost:3000';
 
       const res = await fetch(`${baseUrl}/api/search`, {
@@ -1281,6 +1526,13 @@ export async function searchRealtimePrice(
 
       if (res.ok) {
         const data = await res.json();
+        if (Array.isArray(data.providersStatus)) {
+          backendStatuses = data.providersStatus;
+          backendFailedProviders = data.providersStatus
+            .filter((p: any) => p.status === 'timeout' || p.status === 'failed')
+            .map((p: any) => p.providerName);
+        }
+
         // Accept products returned by backend even if overall verified is false (e.g. unverified web search snippets)
         if ((data.hasLiveResults || data.verified || (data.products && data.products.length > 0) || data.product) && (data.product || (data.products && data.products.length > 0))) {
           const prods: Product[] = data.products && data.products.length > 0
@@ -1299,7 +1551,9 @@ export async function searchRealtimePrice(
     try {
       const connectorResult = await connectorRegistry.searchAll(analysis, targetLocation, category, demoMode);
       if (connectorResult.groupedResults.allGroups && connectorResult.groupedResults.allGroups.length > 0) {
-        const unifiedProducts = connectorResult.groupedResults.allGroups.map(g => convertGroupedToProduct(g, targetLocation));
+        const unifiedProducts = connectorResult.groupedResults.allGroups
+          .map(g => convertGroupedToProduct(g, targetLocation))
+          .filter((p): p is Product => p !== null);
         return { products: unifiedProducts, sources: connectorResult.queriedSources };
       }
     } catch (connectorErr) {
@@ -1345,8 +1599,18 @@ export async function searchRealtimePrice(
   const mergedProducts = Array.from(combinedMap.values());
 
   if (mergedProducts.length > 0) {
-    // Prioritize products with verified images
+    const qLower = rawQuery.toLowerCase();
+    const modelMatch = qLower.match(/\b(14c|15c|a\d{2}|s\d{2}|note\s*\d+|spark\s*\d+|spark|840|213l)\b/i);
+    const targetModel = modelMatch ? modelMatch[1].replace(/\s+/g, '').toLowerCase() : null;
+
+    // Prioritize products matching exact model requested, then products with genuine images
     mergedProducts.sort((a, b) => {
+      if (targetModel) {
+        const aHas = a.name.toLowerCase().replace(/[\s\-_]+/g, '').includes(targetModel);
+        const bHas = b.name.toLowerCase().replace(/[\s\-_]+/g, '').includes(targetModel);
+        if (aHas && !bHas) return -1;
+        if (!aHas && bHas) return 1;
+      }
       const aImg = a.image ? 1 : 0;
       const bImg = b.image ? 1 : 0;
       if (aImg !== bImg) return bImg - aImg;
@@ -1365,7 +1629,9 @@ export async function searchRealtimePrice(
         verified: hasAnyVerified,
         product: filteredProducts[0],
         products: filteredProducts,
-        sources: allSources
+        sources: allSources,
+        providersStatus: backendStatuses,
+        unreachableRetailers: backendFailedProviders
       };
     }
   }
@@ -1375,6 +1641,8 @@ export async function searchRealtimePrice(
     verified: false,
     product: null,
     products: [],
-    message: "No current price found."
+    message: "No current price found.",
+    providersStatus: backendStatuses,
+    unreachableRetailers: backendFailedProviders
   };
 }

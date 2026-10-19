@@ -94,6 +94,7 @@ export default function App() {
   const [isLiveSearching, setIsLiveSearching] = useState(false);
   const [liveSearchFailed, setLiveSearchFailed] = useState(false);
   const [liveSearchFailedMessage, setLiveSearchFailedMessage] = useState<string | undefined>();
+  const [unreachableRetailers, setUnreachableRetailers] = useState<string[]>([]);
   const [lastLiveQueried, setLastLiveQueried] = useState<string>('');
   const searchRequestIdRef = useRef<number>(0);
   
@@ -371,6 +372,7 @@ export default function App() {
 
       // Check whether products were returned, regardless of verified-price status
       const hasProducts = Boolean((result.products && result.products.length > 0) || result.product);
+      setUnreachableRetailers(result.unreachableRetailers || []);
       if (hasProducts) {
         const discoveredList: Product[] = result.products && result.products.length > 0
           ? result.products
@@ -565,6 +567,7 @@ export default function App() {
     searchRequestIdRef.current++;
     setSearchQuery('');
     setLiveSearchFailed(false);
+    setUnreachableRetailers([]);
     setIsLiveSearching(false);
     setLastLiveQueried('');
   };
@@ -728,15 +731,36 @@ export default function App() {
           </div>
         )}
 
+        {/* Unreachable Retailers Transparency Notification */}
+        {unreachableRetailers.length > 0 && !isLiveSearching && searchQuery.trim().length >= 2 && (
+          <div className="bg-neutral-900/80 border border-neutral-700/60 rounded-2xl p-3.5 text-xs flex items-start gap-2.5 text-neutral-300 shadow-sm">
+            <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <span className="font-semibold text-neutral-200">
+                Notice: Some external retailer connections could not be reached ({unreachableRetailers.join(', ')}).
+              </span>
+              <p className="text-neutral-400">
+                Live prices displayed below are compiled from responsive providers. Results from timed-out or unconfigured sources are omitted rather than guessed.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Honest Live Search Status Notification when 0 live results found */}
         {searchQuery.trim().length >= 2 && !isLiveSearching && liveSearchFailed && categorizedResults.verifiedLive.length === 0 && categorizedResults.onlineUnverified.length === 0 && (
           <div className="bg-amber-950/30 border border-amber-800/60 rounded-2xl p-4 text-xs space-y-2">
             <div className="flex items-center gap-2 text-amber-300 font-bold">
               <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
-              <span>No live results available from connected external sources for "{searchQuery}".</span>
+              <span>
+                {unreachableRetailers.length > 0
+                  ? `Some retailers could not be reached, and no matching products were found on responsive sources for "${searchQuery}".`
+                  : `No matching products found across connected retailers for "${searchQuery}".`}
+              </span>
             </div>
             <p className="text-neutral-400">
-              The connected external providers returned 0 current listings for this query. Any products displayed below are community reports or benchmark reference data (clearly labeled).
+              {unreachableRetailers.length > 0
+                ? `Responsive retailers returned 0 matching listings for this query. Sources that could not be reached: ${unreachableRetailers.join(', ')}.`
+                : `Connected external providers returned 0 current listings for this query. Any products displayed below are community reports or benchmark reference data (clearly labeled).`}
             </p>
           </div>
         )}

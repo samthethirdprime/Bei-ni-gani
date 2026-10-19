@@ -11,12 +11,14 @@ import { SpecialtyRetailersConnector } from './specialtyRetailersConnector';
 import { MasokoConnector } from './masokoConnector';
 import { SocialCommerceConnector } from './socialCommerceConnector';
 import { CommunityReportsConnector } from './communityConnector';
+import { AvechiKenyaConnector } from './avechiConnector';
 import { groupListingsIntoProducts } from '../productMatcher';
 
 class ConnectorRegistry {
   private connectors: Map<string, SourceConnector> = new Map();
 
   constructor() {
+    this.register(new AvechiKenyaConnector());
     this.register(new JumiaKenyaConnector());
     this.register(new KilimallConnector());
     this.register(new JijiKenyaConnector());
